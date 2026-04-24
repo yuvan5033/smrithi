@@ -16,7 +16,15 @@ app.use((req, res, next) => {
 
 app.get('/', (req, res) => res.send('Backend is running'));
 
-const storage = new Storage();
+let storageOptions = {};
+if (process.env.GOOGLE_CREDENTIALS_JSON) {
+  try {
+    storageOptions.credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
+  } catch (error) {
+    console.error("Error parsing GOOGLE_CREDENTIALS_JSON:", error);
+  }
+}
+const storage = new Storage(storageOptions);
 const bucketName = process.env.GCS_BUCKET_NAME || 'smrithi_archive';
 
 const transporter = nodemailer.createTransport({
