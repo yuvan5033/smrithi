@@ -5,12 +5,14 @@
       "https://smrithiexperience.netlify.app"
     ],
     "method": [
-      "PUT",
       "GET",
-      "OPTIONS"
+      "POST",
+      "PUT",
+      "OPTIONS",
+      "DELETE"
     ],
     "responseHeader": [
-      "Content-Type"
+      "*"
     ],
     "maxAgeSeconds": 3600
   }
