@@ -1,8 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { v4: uuidv4 } = require('uuid');
-const { Storage } = require('@google-cloud/storage');
+const crypto = require('crypto'); const { Storage } = require('@google-cloud/storage');
 const nodemailer = require('nodemailer');
 
 const app = express();
@@ -92,7 +91,7 @@ async function sendNotificationEmail(orderId, metadata) {
 
 // Generate a new Order ID
 app.post('/api/orders', (req, res) => {
-  const orderId = uuidv4();
+  const orderId = crypto.randomUUID(); // <--- CHANGE TO THIS
   console.log(`Generated Order ID: ${orderId}`);
   res.json({ orderId });
 });
