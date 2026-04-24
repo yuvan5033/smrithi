@@ -6,7 +6,19 @@ const { Storage } = require('@google-cloud/storage');
 const nodemailer = require('nodemailer');
 
 const app = express();
-app.use(cors());
+
+// 1. DYNAMIC CORS FOR NETLIFY AND LOCALHOST
+const allowedOrigins = [
+  'http://localhost:5173',
+  process.env.FRONTEND_URL // Make sure to add this variable in Render (e.g., https://smrithi-atelier.netlify.app)
+].filter(Boolean);
+
+app.use(cors({
+  origin: allowedOrigins,
+  methods: ['GET', 'POST', 'PUT', 'OPTIONS'],
+  allowedHeaders: ['Content-Type']
+}));
+
 app.use(express.json());
 
 app.use((req, res, next) => {
@@ -14,16 +26,25 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/', (req, res) => res.send('Backend is running'));
+app.get('/', (req, res) => res.send('Smrithi Engine is live'));
 
+// 2. DYNAMIC GOOGLE CLOUD AUTHENTICATION
 let storageOptions = {};
+
 if (process.env.GOOGLE_CREDENTIALS_JSON) {
+  // Production (Render): Parse the JSON string from the environment variable
   try {
     storageOptions.credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
   } catch (error) {
     console.error("Error parsing GOOGLE_CREDENTIALS_JSON:", error);
   }
+} else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+  // Local: Fallback to the file path defined in your local .env
+  storageOptions.keyFilename = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+} else {
+  console.warn("No Google Cloud credentials found. Uploads will fail.");
 }
+
 const storage = new Storage(storageOptions);
 const bucketName = process.env.GCS_BUCKET_NAME || 'smrithi_archive';
 
@@ -79,7 +100,7 @@ app.post('/api/orders', (req, res) => {
 // Generate signed URLs for multiple files
 app.post('/api/upload-urls', async (req, res) => {
   const { orderId, files } = req.body;
-  
+
   if (!orderId || !files || !Array.isArray(files)) {
     return res.status(400).json({ error: 'Invalid request: requires orderId and files array.' });
   }
@@ -88,11 +109,9 @@ app.post('/api/upload-urls', async (req, res) => {
 
   try {
     const urls = await Promise.all(files.map(async (f) => {
-      // Path in bucket: orders/<orderId>/<stepId>/<unique_id>_<filename>
-      // Make filename safe
       const safeFilename = f.filename.replace(/[^a-zA-Z0-9.\-_]/g, '_');
       const gcsFileName = `orders/${orderId}/${f.stepId}/${f.id}_${safeFilename}`;
-      
+
       const file = storage.bucket(bucketName).file(gcsFileName);
       const [url] = await file.getSignedUrl({
         version: 'v4',
@@ -100,7 +119,7 @@ app.post('/api/upload-urls', async (req, res) => {
         expires: Date.now() + 60 * 60 * 1000, // 1 hour expiration
         contentType: f.contentType,
       });
-      
+
       return { id: f.id, url, path: gcsFileName };
     }));
 
@@ -115,10 +134,10 @@ app.post('/api/upload-urls', async (req, res) => {
 app.get('/api/orders/:orderId/assets', async (req, res) => {
   const { orderId } = req.params;
   console.log(`Fetching assets for Order: ${orderId}`);
-  
+
   try {
     const [files] = await storage.bucket(bucketName).getFiles({ prefix: `orders/${orderId}/` });
-    
+
     const urls = await Promise.all(files.map(async (file) => {
       const [url] = await file.getSignedUrl({
         version: 'v4',
@@ -143,17 +162,16 @@ app.get('/api/orders/:orderId/assets', async (req, res) => {
 app.post('/api/orders/:orderId/metadata', async (req, res) => {
   const { orderId } = req.params;
   const metadata = req.body;
-  
+
   try {
     const file = storage.bucket(bucketName).file(`orders/${orderId}/metadata.json`);
     await file.save(JSON.stringify(metadata, null, 2), {
       contentType: 'application/json',
     });
     console.log(`Metadata saved for Order: ${orderId}`);
-    
-    // Trigger notification
+
     await sendNotificationEmail(orderId, metadata);
-    
+
     res.json({ success: true });
   } catch (error) {
     console.error('Error saving metadata:', error);
@@ -169,12 +187,12 @@ app.get('/api/orders/:orderId/metadata', async (req, res) => {
     const [content] = await file.download();
     res.json(JSON.parse(content.toString()));
   } catch (error) {
-    // If not found, just return empty object instead of error
     res.json({});
   }
 });
 
+// 3. DYNAMIC PORT BINDING FOR CLOUD HOSTING
 const PORT = process.env.PORT || 3002;
 app.listen(PORT, () => {
-  console.log(`Backend server running on http://localhost:${PORT}`);
+  console.log(`Backend server running on port ${PORT}`);
 });

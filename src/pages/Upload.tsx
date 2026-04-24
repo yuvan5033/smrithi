@@ -5,6 +5,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Plus, Check } from 'lucide-react';
 import { useCallback, useRef } from 'react';
 
+// Get the API URL from the environment, fallback to localhost
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3002';
+
 function AppleProcessing({ onComplete }: { onComplete: () => void }) {
   const [phase, setPhase] = useState(0);
 
@@ -87,7 +90,7 @@ export function Upload() {
 
   useEffect(() => {
     if (step === 2 && !orderId) {
-      fetch('http://localhost:3002/api/orders', { method: 'POST' })
+      fetch(`${API_BASE}/api/orders`, { method: 'POST' })
         .then(res => res.json())
         .then(data => setOrderId(data.orderId))
         .catch(err => console.error('Failed to create order ID', err));
@@ -110,24 +113,24 @@ export function Upload() {
         headers: { 'Content-Type': task.file.type },
         body: task.file
       })
-      .then(res => {
-        if (!res.ok) throw new Error('Upload failed');
-        setPhotos(prev => ({
-          ...prev,
-          [task.stepId]: (prev[task.stepId] || []).map(p => p.id === task.id ? { ...p, status: 'uploaded' } : p)
-        }));
-      })
-      .catch(err => {
-        console.error('Upload error:', err);
-        setPhotos(prev => ({
-          ...prev,
-          [task.stepId]: (prev[task.stepId] || []).map(p => p.id === task.id ? { ...p, status: 'error' } : p)
-        }));
-      })
-      .finally(() => {
-        activeUploadsRef.current -= 1;
-        processQueue();
-      });
+        .then(res => {
+          if (!res.ok) throw new Error('Upload failed');
+          setPhotos(prev => ({
+            ...prev,
+            [task.stepId]: (prev[task.stepId] || []).map(p => p.id === task.id ? { ...p, status: 'uploaded' } : p)
+          }));
+        })
+        .catch(err => {
+          console.error('Upload error:', err);
+          setPhotos(prev => ({
+            ...prev,
+            [task.stepId]: (prev[task.stepId] || []).map(p => p.id === task.id ? { ...p, status: 'error' } : p)
+          }));
+        })
+        .finally(() => {
+          activeUploadsRef.current -= 1;
+          processQueue();
+        });
     }
   }, []);
 
@@ -157,7 +160,7 @@ export function Upload() {
 
     if (orderId) {
       try {
-        const res = await fetch('http://localhost:3002/api/upload-urls', {
+        const res = await fetch(`${API_BASE}/api/upload-urls`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -204,10 +207,9 @@ export function Upload() {
 
   const nextStep = async () => {
     if (step === TOTAL_STEPS) {
-      // Final step: Save metadata before showing processing screen
       if (orderId) {
         try {
-          await fetch(`http://localhost:3002/api/orders/${orderId}/metadata`, {
+          await fetch(`${API_BASE}/api/orders/${orderId}/metadata`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(form)
@@ -359,7 +361,7 @@ export function Upload() {
                         >
                           <motion.img layoutId={`photo-${photo.id}`} src={photo.url} alt={photo.name} className="w-full h-full object-cover block" />
                           <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                          
+
                           {photo.status === 'uploading' && (
                             <div className="absolute inset-0 bg-black/40 flex items-center justify-center backdrop-blur-[2px]">
                               <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -370,7 +372,7 @@ export function Upload() {
                               <Check size={14} color="white" />
                             </div>
                           )}
-                          
+
                           <button
                             className="absolute top-2 right-2 w-7 h-7 bg-black/40 backdrop-blur-md rounded-full border-none cursor-pointer flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-black/60 hover:scale-110"
                             onClick={(e) => removePhoto(stepId, photo.id, e)}
