@@ -191,8 +191,4 @@ app.get('/api/orders/:orderId/metadata', async (req, res) => {
   }
 });
 
-// 3. DYNAMIC PORT BINDING FOR CLOUD HOSTING
-const PORT = process.env.PORT || 3002;
-app.listen(PORT, () => {
-  console.log(`Backend server running on port ${PORT}`);
-});
+module.exports = app;
