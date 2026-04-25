@@ -6,6 +6,8 @@ import { RealisticBook } from '../components/book/RealisticBook';
 import { PageSpread } from '../components/book/PageSpread';
 import { useNavigate } from 'react-router-dom';
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3002';
+
 const COVER_COLORS = [
   { name: 'Espresso', hex: '#1E0E06', light: true },
   { name: 'Cordovan', hex: '#4E3420', light: true },
@@ -21,6 +23,17 @@ const FONT_OPTIONS = [
   { id: 'playfair', name: 'Playfair Display', preview: 'Kyoto' },
 ];
 
+// Utility to load Razorpay script dynamically
+const loadRazorpayScript = () => {
+  return new Promise((resolve) => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
+
 export function Preview() {
   const navigate = useNavigate();
   const [coverColorId, setCoverColorId] = useState(1);
@@ -30,10 +43,89 @@ export function Preview() {
   const [view, setView] = useState<'cover' | 'pages'>('cover');
   const [ref, isVisible] = useInView();
 
+  const [isProcessing, setIsProcessing] = useState(false);
+
   const coverColor = COVER_COLORS[coverColorId];
 
+  const handlePayment = async () => {
+    setIsProcessing(true);
+
+    // 1. Load the script
+    const res = await loadRazorpayScript();
+    if (!res) {
+      alert('Razorpay SDK failed to load. Are you online?');
+      setIsProcessing(false);
+      return;
+    }
+
+    try {
+      // 2. Create Order on Backend
+      const orderResponse = await fetch(`${API_BASE}/api/create-order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const orderData = await orderResponse.json();
+
+      if (!orderData || !orderData.id) {
+        alert('Server error. Please try again.');
+        setIsProcessing(false);
+        return;
+      }
+
+      // 3. Initialize Razorpay Modal
+      const options = {
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: "Smrithi Atelier",
+        description: `Archival Edition: ${tripName}`,
+        order_id: orderData.id,
+        handler: async function (response: any) {
+          // 4. Verify Signature on Backend
+          const verifyResponse = await fetch(`${API_BASE}/api/verify-payment`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            }),
+          });
+
+          const verifyData = await verifyResponse.json();
+          if (verifyData.success) {
+            // Payment successful! Proceed to the upload/metadata flow
+            navigate('/upload');
+          } else {
+            alert('Payment verification failed. Please contact support.');
+          }
+        },
+        prefill: {
+          name: "",
+          email: "",
+          contact: ""
+        },
+        theme: {
+          color: "#4E3420" // Matches your Cordovan/Sienna theme
+        }
+      };
+
+      const paymentObject = new (window as any).Razorpay(options);
+      paymentObject.on('payment.failed', function (response: any) {
+        alert(`Payment failed: ${response.error.description}`);
+      });
+
+      paymentObject.open();
+    } catch (error) {
+      console.error(error);
+      alert('Something went wrong during checkout.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return (
-    <div ref={ref} className="py-28 px-[max(40px,5vw)] pt-28">
+    <div ref={ref} className="py-28 px-[max(40px,5vw)] pt-28 pb-40">
       <SectionHeader
         label="Preview Engine"
         title={
@@ -49,11 +141,10 @@ export function Preview() {
         {(['cover', 'pages'] as const).map((v) => (
           <button
             key={v}
-            className={`px-5 py-2.5 text-[0.62rem] tracking-[0.2em] uppercase cursor-pointer font-jost font-light transition-all duration-200 border ${
-              view === v
+            className={`px-5 py-2.5 text-[0.62rem] tracking-[0.2em] uppercase cursor-pointer font-jost font-light transition-all duration-200 border ${view === v
                 ? 'bg-[var(--sienna)] text-[var(--cream)] border-[var(--sienna)]'
                 : 'border-[var(--border)] bg-transparent text-[var(--ink-60)]'
-            }`}
+              }`}
             onClick={() => setView(v)}
           >
             {v === 'cover' ? 'Book Cover' : 'Interior Pages'}
@@ -116,9 +207,8 @@ export function Preview() {
               {COVER_COLORS.map((color, i) => (
                 <div
                   key={i}
-                  className={`w-[30px] h-[30px] rounded-sm cursor-pointer border-2 transition-all duration-200 hover:scale-110 ${
-                    coverColorId === i ? 'border-[var(--gold)]' : 'border-transparent'
-                  }`}
+                  className={`w-[30px] h-[30px] rounded-sm cursor-pointer border-2 transition-all duration-200 hover:scale-110 ${coverColorId === i ? 'border-[var(--gold)]' : 'border-transparent'
+                    }`}
                   style={{
                     background: color.hex,
                     outline: color.hex === '#D8CEB8' ? '1px solid var(--border)' : 'none',
@@ -137,11 +227,10 @@ export function Preview() {
             {FONT_OPTIONS.map((font) => (
               <button
                 key={font.id}
-                className={`p-3 px-4 border cursor-pointer text-left bg-none transition-all duration-200 ${
-                  fontStyle === font.id
+                className={`p-3 px-4 border cursor-pointer text-left bg-none transition-all duration-200 ${fontStyle === font.id
                     ? 'border-[var(--sienna)] bg-[rgba(78,52,32,0.03)]'
                     : 'border-[var(--border)] hover:border-[var(--sienna)]'
-                }`}
+                  }`}
                 onClick={() => setFontStyle(font.id)}
               >
                 <div className="text-[0.68rem] text-[var(--ink-60)] mb-0.5">{font.name}</div>
@@ -152,8 +241,8 @@ export function Preview() {
                       font.id === 'cormorant'
                         ? "'Cormorant Garamond', serif"
                         : font.id === 'jost'
-                        ? "'Jost', sans-serif"
-                        : "'Playfair Display', serif",
+                          ? "'Jost', sans-serif"
+                          : "'Playfair Display', serif",
                     fontStyle: font.id !== 'jost' ? 'italic' : 'normal',
                   }}
                 >
@@ -162,15 +251,30 @@ export function Preview() {
               </button>
             ))}
           </div>
-
-          <Button className="w-full" onClick={() => navigate('/upload')}>
-            Begin With These Settings
-          </Button>
-          <p className="text-[0.62rem] text-[var(--ink-35)] text-center tracking-[0.1em] leading-[1.65]">
-            Your preferences carry through when you submit
-          </p>
         </div>
       </div>
+
+      {/* FLOATING PAYMENT BAR */}
+      <div className="fixed bottom-0 left-0 w-full bg-[#fdfbf7]/90 backdrop-blur-md border-t border-[var(--border)] py-4 px-[max(40px,5vw)] z-50 flex justify-between items-center shadow-[0_-10px_40px_rgba(0,0,0,0.03)]">
+        <div className="flex flex-col">
+          <span className="text-[0.55rem] tracking-[0.2em] uppercase text-[var(--ink-60)] mb-1">Archival Edition</span>
+          <span className="text-2xl font-cormorant text-[var(--sienna)] leading-none">₹4,999</span>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <p className="text-[0.62rem] text-[var(--ink-35)] tracking-[0.1em] hidden md:block">
+            Settings lock upon checkout
+          </p>
+          <Button
+            onClick={handlePayment}
+            disabled={isProcessing}
+            className="px-8 bg-[var(--sienna)] text-[var(--cream)] border-none hover:bg-[#3A2414] transition-colors"
+          >
+            {isProcessing ? 'Processing...' : 'Confirm & Pay'}
+          </Button>
+        </div>
+      </div>
+
     </div>
   );
 }

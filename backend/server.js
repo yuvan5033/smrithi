@@ -1,10 +1,18 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const crypto = require('crypto'); const { Storage } = require('@google-cloud/storage');
+const crypto = require('crypto');
+const { Storage } = require('@google-cloud/storage');
 const nodemailer = require('nodemailer');
 
 const app = express();
+
+const Razorpay = require('razorpay');
+
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
 
 // 1. DYNAMIC CORS FOR NETLIFY AND LOCALHOST
 const allowedOrigins = [
@@ -126,6 +134,44 @@ app.post('/api/upload-urls', async (req, res) => {
   } catch (error) {
     console.error('Error generating signed URLs:', error);
     res.status(500).json({ error: 'Failed to generate signed URLs' });
+  }
+});
+
+// --- RAZORPAY INTEGRATION ---
+
+// 1. Create Order
+app.post('/api/create-order', async (req, res) => {
+  try {
+    const options = {
+      amount: 499000, // e.g., ₹4,999 in paise (multiply by 100). Adjust as needed.
+      currency: "INR",
+      receipt: `receipt_${uuidv4()}`
+    };
+
+    const order = await razorpay.orders.create(options);
+    res.json(order);
+  } catch (err) {
+    console.error("Error creating Razorpay order:", err);
+    res.status(500).json({ error: 'Failed to create payment order' });
+  }
+});
+
+// 2. Verify Payment Signature
+app.post('/api/verify-payment', (req, res) => {
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+
+  const sign = razorpay_order_id + "|" + razorpay_payment_id;
+  const expectedSign = crypto
+    .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+    .update(sign.toString())
+    .digest("hex");
+
+  if (razorpay_signature === expectedSign) {
+    console.log(`Payment Verified for Order: ${razorpay_order_id}`);
+    res.json({ success: true, message: "Payment verified successfully" });
+  } else {
+    console.error("Payment Verification Failed: Invalid Signature");
+    res.status(400).json({ success: false, error: "Invalid signature" });
   }
 });
 
