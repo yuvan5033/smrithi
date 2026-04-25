@@ -17,7 +17,8 @@ const razorpay = new Razorpay({
 // 1. DYNAMIC CORS FOR NETLIFY AND LOCALHOST
 const allowedOrigins = [
   'http://localhost:5173',
-  process.env.FRONTEND_URL // Make sure to add this variable in Render (e.g., https://smrithi-atelier.netlify.app)
+  'https://smrithiexperience.netlify.app',
+  process.env.FRONTEND_URL
 ].filter(Boolean);
 
 app.use(cors({
@@ -26,7 +27,8 @@ app.use(cors({
   allowedHeaders: ['Content-Type']
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
