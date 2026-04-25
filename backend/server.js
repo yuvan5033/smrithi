@@ -293,7 +293,7 @@ app.get('/api/orders/:orderId/metadata', async (req, res) => {
   }
 });
 
-// Ops Engine Export — uploads final spreads, generates preview code, emails client
+// Ops Engine Export — new path: preview/CODE/CODE.json + preview/CODE/preview_folder/
 app.post('/api/orders/:orderId/export', async (req, res) => {
   const { orderId } = req.params;
   const { spreads } = req.body;
@@ -301,25 +301,39 @@ app.post('/api/orders/:orderId/export', async (req, res) => {
   if (!spreads || !Array.isArray(spreads)) return res.status(400).json({ error: 'Invalid payload.' });
 
   try {
-    const uploadPromises = spreads.map(async (spread) => {
-      const buffer = Buffer.from(spread.base64, 'base64');
-      const file = storage.bucket(bucketName).file(`orders/${orderId}/final/${spread.filename}`);
-      await file.save(buffer, { contentType: 'image/jpeg' });
-    });
-    await Promise.all(uploadPromises);
-
+    // 1. Read order metadata to get client email + dest
     const metaFile = storage.bucket(bucketName).file(`orders/${orderId}/metadata.json`);
     const [metaContent] = await metaFile.download();
     const metadata = JSON.parse(metaContent.toString());
 
+    // 2. Generate the preview code
     const previewCode = generatePreviewCode();
+
+    // 3. Upload final spread images to preview/CODE/preview_folder/
+    const uploadPromises = spreads.map(async (spread) => {
+      const buffer = Buffer.from(spread.base64, 'base64');
+      const file = storage.bucket(bucketName).file(`preview/${previewCode}/preview_folder/${spread.filename}`);
+      await file.save(buffer, { contentType: 'image/jpeg' });
+    });
+    await Promise.all(uploadPromises);
+
+    // 4. Write the pointer JSON: preview/CODE/CODE.json
+    const pointerPayload = {
+      orderId,
+      previewCode,
+      dest: metadata.dest || '',
+      status: 'preview_ready',
+      generatedAt: new Date().toISOString(),
+    };
+    const pointerFile = storage.bucket(bucketName).file(`preview/${previewCode}/${previewCode}.json`);
+    await pointerFile.save(JSON.stringify(pointerPayload, null, 2), { contentType: 'application/json' });
+
+    // 5. Update order metadata with previewCode and status
     metadata.previewCode = previewCode;
-    metadata.status = "preview_ready";
+    metadata.status = 'preview_ready';
     await metaFile.save(JSON.stringify(metadata, null, 2), { contentType: 'application/json' });
 
-    const pointerFile = storage.bucket(bucketName).file(`previews/${previewCode}.json`);
-    await pointerFile.save(JSON.stringify({ orderId }), { contentType: 'application/json' });
-
+    // 6. Email the client their access code
     if (metadata.email) {
       const mailOptions = {
         from: `"Smrithi Atelier" <${process.env.EMAIL_USER}>`,
@@ -343,6 +357,8 @@ app.post('/api/orders/:orderId/export', async (req, res) => {
       };
       await transporter.sendMail(mailOptions);
     }
+
+    console.log(`Export complete. Preview code: ${previewCode} | Order: ${orderId}`);
     res.json({ success: true, previewCode });
   } catch (error) {
     console.error('Export error:', error);
@@ -350,28 +366,37 @@ app.post('/api/orders/:orderId/export', async (req, res) => {
   }
 });
 
-// Client Preview Lookup — reads pointer file, returns signed spread URLs
+// Client Preview Lookup — reads preview/CODE/CODE.json, returns signed spread URLs
 app.get('/api/preview/:code', async (req, res) => {
   const cleanCode = req.params.code.toUpperCase().trim();
   try {
-    const pointerFile = storage.bucket(bucketName).file(`previews/${cleanCode}.json`);
+    // Read the pointer JSON at preview/CODE/CODE.json
+    const pointerFile = storage.bucket(bucketName).file(`preview/${cleanCode}/${cleanCode}.json`);
     const [pointerExists] = await pointerFile.exists();
     if (!pointerExists) return res.status(404).json({ error: 'Invalid access code.' });
 
     const [pointerContent] = await pointerFile.download();
-    const { orderId } = JSON.parse(pointerContent.toString());
+    const pointer = JSON.parse(pointerContent.toString());
+    const { orderId } = pointer;
 
+    // Read order metadata
     const metaFile = storage.bucket(bucketName).file(`orders/${orderId}/metadata.json`);
     const [metaContent] = await metaFile.download();
     const metadata = JSON.parse(metaContent.toString());
 
-    const [files] = await storage.bucket(bucketName).getFiles({ prefix: `orders/${orderId}/final/` });
+    // List spread images from preview/CODE/preview_folder/
+    const [files] = await storage.bucket(bucketName).getFiles({ prefix: `preview/${cleanCode}/preview_folder/` });
     const urls = await Promise.all(files.map(async (file) => {
       const [url] = await file.getSignedUrl({ version: 'v4', action: 'read', expires: Date.now() + 60 * 60 * 1000 });
       return { name: file.name.split('/').pop(), url };
     }));
 
-    res.json({ orderId, metadata, spreads: urls.sort((a, b) => a.name.localeCompare(b.name)) });
+    res.json({
+      orderId,
+      previewCode: cleanCode,
+      metadata,
+      spreads: urls.sort((a, b) => a.name.localeCompare(b.name))
+    });
   } catch (error) {
     console.error('Preview lookup error:', error);
     res.status(500).json({ error: 'Failed to retrieve preview.' });

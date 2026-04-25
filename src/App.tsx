@@ -12,6 +12,7 @@ import { Gallery } from './pages/Gallery';
 import { FAQ } from './pages/FAQ';
 import { Upload } from './pages/Upload';
 import { Preview } from './pages/Preview';
+import { PreviewClient } from './pages/PreviewClient';
 import { Success } from './pages/Success';
 import SmrithiDefinitiveAtelier from './pages/ops';
 
@@ -73,14 +74,7 @@ function AppContent() {
             <Footer />
           </>
         } />
-        <Route path="/preview" element={
-          <>
-            <Preview />
-            <CTASection />
-            <hr className="border-none border-t border-[var(--border)] m-0" />
-            <Footer />
-          </>
-        } />
+        <Route path="/preview" element={<PreviewClient />} />
         <Route path="/success" element={
           <Success />
         } />

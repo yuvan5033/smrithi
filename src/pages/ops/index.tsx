@@ -148,10 +148,38 @@ export default function SmrithiDefinitiveAtelier() {
         });
 
         if (res.ok) {
-          alert("Successfully synced final layouts to Google Cloud Archival.");
+          const result = await res.json();
+          const previewCode = result.previewCode || 'N/A';
+
+          // Add reference text file to the ZIP
+          const refText = [
+            'SMRITHI ATELIER — PRINT ARCHIVE',
+            '================================',
+            '',
+            `Order ID    : ${orderIdToSync.trim()}`,
+            `Preview Code: ${previewCode}`,
+            `Exported At : ${new Date().toISOString()}`,
+            '',
+            'Client preview URL:',
+            `${window.location.origin}/preview`,
+            '',
+            'Enter the Preview Code above on the preview page to view the digital proof.',
+          ].join('\n');
+
+          zip.file('SMRITHI_REFERENCE.txt', refText);
+
+          // Re-generate the ZIP with the reference file included
+          const updatedZipBlob = await zip.generateAsync({ type: 'blob' });
+          saveAs(updatedZipBlob, 'smrithi-print-ready.zip');
+
+          alert(`Cloud sync complete.\n\nPreview Code: ${previewCode}\n\nThe client can view their edition at /preview using this code.`);
         } else {
-          alert("ZIP downloaded, but cloud sync failed. Check console.");
+          alert('ZIP downloaded, but cloud sync failed. Check console.');
         }
+      } else {
+        // No order ID — just download the ZIP as-is
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        saveAs(zipBlob, 'smrithi-print-ready.zip');
       }
 
     } catch (e) {
