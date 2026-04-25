@@ -143,9 +143,9 @@ app.post('/api/upload-urls', async (req, res) => {
 app.post('/api/create-order', async (req, res) => {
   try {
     const options = {
-      amount: 499000, // e.g., ₹4,999 in paise (multiply by 100). Adjust as needed.
+      amount: 499000,
       currency: "INR",
-      receipt: `receipt_${crypto.randomUUID()}`
+      receipt: crypto.randomUUID() // <--- Exactly 36 characters. Perfect.
     };
 
     const order = await razorpay.orders.create(options);
