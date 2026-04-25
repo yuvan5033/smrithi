@@ -46,7 +46,8 @@ export function useAtelier() {
 
   const loadOrderAssets = async (orderId: string) => {
     try {
-      const res = await fetch(`http://localhost:3002/api/orders/${orderId}/assets`);
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3002';
+      const res = await fetch(`${API_BASE}/api/orders/${orderId}/assets`);
       const data = await res.json();
       if (data.assets && Array.isArray(data.assets)) {
         const newAssets: Asset[] = await Promise.all(data.assets.map(async (a: any) => {
@@ -80,7 +81,7 @@ export function useAtelier() {
             img.src = a.url;
           });
         }));
-        
+
         setLibrary(prev => [...prev, ...newAssets]);
 
         // Auto-place into spreads based on step mapping
@@ -97,7 +98,7 @@ export function useAtelier() {
 
         setSpreads(prevSpreads => {
           const nextSpreads = [...prevSpreads];
-          
+
           const assetsByStep: Record<string, Asset[]> = {};
           newAssets.forEach(a => {
             if (a.step) {
@@ -115,7 +116,7 @@ export function useAtelier() {
 
             for (const spreadIdx of spreadIndices) {
               if (!nextSpreads[spreadIdx]) continue;
-              
+
               const spread = { ...nextSpreads[spreadIdx] };
               const left = { ...spread.left, slots: [...spread.left.slots] };
               const right = { ...spread.right, slots: [...spread.right.slots] };
@@ -144,14 +145,14 @@ export function useAtelier() {
 
         // Load Metadata and populate text slots
         try {
-          const metaRes = await fetch(`http://localhost:3002/api/orders/${orderId}/metadata`);
+          const metaRes = await fetch(`${API_BASE}/api/orders/${orderId}/metadata`);
           const meta = await metaRes.json();
           setOrderMetadata(meta);
-          
+
           if (meta && Object.keys(meta).length > 0) {
             setSpreads(prev => {
               const next = [...prev];
-              
+
               // Spread 1 (Index 0): Right page text
               if (meta.dest || meta.dates) {
                 const s1 = { ...next[0] };
@@ -213,7 +214,7 @@ export function useAtelier() {
   const runAutoCompose = () => {
     if (library.length === 0) return;
     const sorted = [...library].sort((a, b) => a.ts - b.ts || a.name.localeCompare(b.name));
-    
+
     let imgIndex = 0;
     const nextSpreads = [...spreads];
 
@@ -239,7 +240,7 @@ export function useAtelier() {
       spread.right = right;
       nextSpreads[s] = spread;
     }
-    
+
     pushHistory(nextSpreads);
   };
 
@@ -299,8 +300,8 @@ export function useAtelier() {
       const page = spread[side];
       const newSlot: EditorSlot = {
         id: Math.random().toString(36).slice(2, 9),
-        x: x - (w/2),
-        y: y - (h/2),
+        x: x - (w / 2),
+        y: y - (h / 2),
         w,
         h,
         assetId,
@@ -359,11 +360,11 @@ export function useAtelier() {
       const fromSide = toSide === 'left' ? 'right' : 'left';
       const slotIndex = spread[fromSide].slots.findIndex(s => s.id === slotId);
       if (slotIndex < 0) return spread; // Already on this side or doesn't exist
-      
+
       const slotToMove = { ...spread[fromSide].slots[slotIndex], x: newX, y: newY };
       const newFromSlots = [...spread[fromSide].slots];
       newFromSlots.splice(slotIndex, 1);
-      
+
       return {
         ...spread,
         [fromSide]: { ...spread[fromSide], slots: newFromSlots },
@@ -408,10 +409,10 @@ export function useAtelier() {
       }
 
       // Reconstruct
-      const newSpread: EditorSpread = { 
-        ...spread, 
-        left: { slots: [], texts: [] }, 
-        right: { slots: [], texts: [] } 
+      const newSpread: EditorSpread = {
+        ...spread,
+        left: { slots: [], texts: [] },
+        right: { slots: [], texts: [] }
       };
 
       // Ensure stable sorting after modification
