@@ -2,7 +2,9 @@
   {
     "origin": [
       "http://localhost:5173",
-      "https://smrithiexperience.netlify.app"
+      "https://smrithiexperience.netlify.app",
+      "https://smrithi.online",
+      "https://www.smrithi.online"
     ],
     "method": [
       "GET",

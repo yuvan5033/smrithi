@@ -20,6 +20,19 @@ type OrderData = {
   spreads: Spread[];
 };
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Extract the leading integer from a spread filename, e.g. "spread_1_CMYK_READY_300DPI" → 1 */
+function spreadIndex(name: string): number {
+  const m = name.match(/(\d+)/);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
+/** Sort spreads numerically by the number embedded in their name */
+function sortSpreads(spreads: Spread[]): Spread[] {
+  return [...spreads].sort((a, b) => spreadIndex(a.name) - spreadIndex(b.name));
+}
+
 // ─── Razorpay Loader ─────────────────────────────────────────────────────────
 
 function loadRazorpayScript(): Promise<boolean> {
@@ -39,22 +52,48 @@ function loadRazorpayScript(): Promise<boolean> {
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3002';
 const EASE = [0.16, 1, 0.3, 1] as const;
 
+// ─── Page-turn animation variants ────────────────────────────────────────────
+//
+// Uses rotateY on a perspective container to simulate a book page turning.
+// Forward  (dir=1):  new page sweeps in from the right (rotateY 90 → 0)
+//                    old page sweeps out to the left   (rotateY 0 → -90)
+// Backward (dir=-1): new page sweeps in from the left  (rotateY -90 → 0)
+//                    old page sweeps out to the right  (rotateY 0 → 90)
+
+const pageTurnVariants = {
+  enter: (dir: number) => ({
+    rotateY: dir > 0 ? 90 : -90,
+    opacity: 0,
+    scale: 0.97,
+  }),
+  center: {
+    rotateY: 0,
+    opacity: 1,
+    scale: 1,
+    transition: { duration: 0.55, ease: EASE },
+  },
+  exit: (dir: number) => ({
+    rotateY: dir > 0 ? -90 : 90,
+    opacity: 0,
+    scale: 0.97,
+    transition: { duration: 0.3, ease: [0.4, 0, 1, 1] },
+  }),
+};
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function PreviewClient() {
   const navigate = useNavigate();
 
-  // State
   const [accessCode, setAccessCode] = useState('');
   const [viewState, setViewState] = useState<'gate' | 'loading' | 'preview'>('gate');
   const [error, setError] = useState<string | null>(null);
   const [orderData, setOrderData] = useState<OrderData | null>(null);
   const [currentSpread, setCurrentSpread] = useState(0);
-  const [direction, setDirection] = useState(1); // 1 = forward, -1 = backward
+  const [direction, setDirection] = useState(1);
   const [showPayment, setShowPayment] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
-  // Trigger payment bar after 4 seconds of preview
   useEffect(() => {
     if (viewState !== 'preview') return;
     const t = setTimeout(() => setShowPayment(true), 4000);
@@ -79,6 +118,10 @@ export function PreviewClient() {
         throw new Error(data.error || 'Invalid access code.');
       }
       const data: OrderData = await res.json();
+
+      // ✦ Sort spreads by number in filename so spread_1 always comes first
+      data.spreads = sortSpreads(data.spreads);
+
       setOrderData(data);
       setCurrentSpread(0);
       setViewState('preview');
@@ -102,7 +145,6 @@ export function PreviewClient() {
     setCurrentSpread((s) => s - 1);
   }, [currentSpread]);
 
-  // Keyboard navigation
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (viewState !== 'preview') return;
@@ -180,29 +222,7 @@ export function PreviewClient() {
     }
   };
 
-  // ─── Animation Variants ────────────────────────────────────────────────────
-
-  const spreadVariants = {
-    enter: (dir: number) => ({
-      opacity: 0,
-      x: dir > 0 ? 60 : -60,
-      filter: 'blur(4px)',
-    }),
-    center: {
-      opacity: 1,
-      x: 0,
-      filter: 'blur(0px)',
-      transition: { duration: 0.65, ease: EASE },
-    },
-    exit: (dir: number) => ({
-      opacity: 0,
-      x: dir > 0 ? -60 : 60,
-      filter: 'blur(4px)',
-      transition: { duration: 0.3, ease: [0.4, 0, 1, 1] },
-    }),
-  };
-
-  // ─── Render: Gate ──────────────────────────────────────────────────────────
+  // ─── Render: Gate / Loading ─────────────────────────────────────────────────
 
   if (viewState === 'gate' || viewState === 'loading') {
     return (
@@ -308,14 +328,16 @@ export function PreviewClient() {
     <div
       style={{
         minHeight: '100dvh',
-        background: '#111',
+        // ✦ Warm cream — no dark background
+        background: '#fdfaf5',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
         position: 'relative',
         overflow: 'hidden',
-        paddingBottom: showPayment ? 100 : 0,
+        paddingTop: 72,
+        paddingBottom: showPayment ? 100 : 40,
         transition: 'padding-bottom 0.5s ease',
       }}
     >
@@ -331,22 +353,28 @@ export function PreviewClient() {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          background: 'linear-gradient(to bottom, rgba(0,0,0,0.7), transparent)',
+          // ✦ Light bar on cream, no dark gradient
+          background: 'rgba(253,250,245,0.9)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderBottom: '1px solid rgba(78,52,32,0.08)',
         }}
       >
-        <div style={{ fontSize: '0.6rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: 'rgba(253,250,245,0.6)', fontFamily: '"Jost", sans-serif' }}>
+        <div style={{ fontSize: '0.6rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: 'rgba(78,52,32,0.5)', fontFamily: '"Jost", sans-serif' }}>
           Smrithi Atelier
         </div>
-        <div style={{ fontSize: '0.6rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(253,250,245,0.4)', fontFamily: '"Jost", sans-serif' }}>
-          {orderData!.metadata.dest || 'Your Edition'}{orderData!.metadata.dates ? ` · ${orderData!.metadata.dates}` : ''}
-        </div>
-        <div style={{ fontSize: '0.65rem', color: 'rgba(253,250,245,0.4)', fontFamily: '"Jost", sans-serif', letterSpacing: '0.1em' }}>
-          {currentSpread + 1} / {total}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+          <div style={{ fontSize: '0.65rem', color: 'var(--sienna)', fontFamily: '"Cormorant Garamond", serif', letterSpacing: '0.05em' }}>
+            {orderData!.metadata.dest || 'Your Edition'}{orderData!.metadata.dates ? ` · ${orderData!.metadata.dates}` : ''}
+          </div>
+          <div style={{ fontSize: '0.55rem', color: 'rgba(78,52,32,0.35)', fontFamily: '"Jost", sans-serif', letterSpacing: '0.1em' }}>
+            {currentSpread + 1} / {total}
+          </div>
         </div>
       </div>
 
       {/* ── Book spread ── */}
-      <div style={{ width: '100%', maxWidth: '90vw', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 32 }}>
+      <div style={{ width: '100%', maxWidth: '90vw', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 24 }}>
 
         {/* Prev button */}
         <button
@@ -354,12 +382,12 @@ export function PreviewClient() {
           disabled={currentSpread === 0}
           style={{
             width: 44, height: 44, borderRadius: '50%',
-            background: 'rgba(253,250,245,0.08)',
-            border: '1px solid rgba(253,250,245,0.15)',
-            color: currentSpread === 0 ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.7)',
+            // ✦ Warm ink tones on light bg
+            background: 'rgba(78,52,32,0.06)',
+            border: '1px solid rgba(78,52,32,0.15)',
+            color: currentSpread === 0 ? 'rgba(78,52,32,0.2)' : 'rgba(78,52,32,0.7)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: currentSpread === 0 ? 'not-allowed' : 'pointer',
-            backdropFilter: 'blur(8px)',
             flexShrink: 0,
             transition: 'all 0.3s ease',
           }}
@@ -367,23 +395,28 @@ export function PreviewClient() {
           <ArrowLeft size={18} />
         </button>
 
-        {/* Spread image with book effect */}
-        <div style={{ position: 'relative', flex: 1, maxWidth: '80vw' }}>
+        {/* Spread image — perspective container enables 3D page-turn */}
+        <div style={{ position: 'relative', flex: 1, maxWidth: '80vw', perspective: '1400px' }}>
           <AnimatePresence mode="wait" custom={direction}>
             <motion.div
               key={currentSpread}
               custom={direction}
-              variants={spreadVariants}
+              variants={pageTurnVariants}
               initial="enter"
               animate="center"
               exit="exit"
-              style={{ position: 'relative' }}
+              // ✦ Transform origin at the spine edge for realistic page-turn feel
+              style={{
+                position: 'relative',
+                transformOrigin: direction > 0 ? 'left center' : 'right center',
+                willChange: 'transform, opacity',
+              }}
             >
-              {/* Book shadow wrapper */}
+              {/* Book shadow wrapper — warm shadows, not black */}
               <div
                 style={{
                   position: 'relative',
-                  boxShadow: '0 40px 100px rgba(0,0,0,0.8), 0 10px 30px rgba(0,0,0,0.5)',
+                  boxShadow: '0 20px 60px rgba(78,52,32,0.18), 0 4px 16px rgba(78,52,32,0.10)',
                   borderRadius: 2,
                 }}
               >
@@ -408,44 +441,40 @@ export function PreviewClient() {
                     background: `
                       linear-gradient(
                         to right,
-                        rgba(0,0,0,0.12) 0%,
+                        rgba(78,52,32,0.06) 0%,
                         transparent 8%,
                         transparent 43%,
-                        rgba(0,0,0,0.32) 48.5%,
-                        rgba(0,0,0,0.42) 50%,
-                        rgba(0,0,0,0.32) 51.5%,
+                        rgba(0,0,0,0.18) 48.5%,
+                        rgba(0,0,0,0.26) 50%,
+                        rgba(0,0,0,0.18) 51.5%,
                         transparent 57%,
                         transparent 92%,
-                        rgba(0,0,0,0.12) 100%
+                        rgba(78,52,32,0.06) 100%
                       )
                     `,
                     borderRadius: 2,
                   }}
                 />
 
-                {/* Page-curl edge highlight on left page */}
+                {/* Left page edge highlight */}
                 <div
                   style={{
                     position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    bottom: 0,
+                    top: 0, left: 0, bottom: 0,
                     width: '2px',
-                    background: 'linear-gradient(to bottom, rgba(255,255,255,0.04), rgba(255,255,255,0.12), rgba(255,255,255,0.04))',
+                    background: 'linear-gradient(to bottom, rgba(255,255,255,0.3), rgba(255,255,255,0.5), rgba(255,255,255,0.3))',
                     borderRadius: '2px 0 0 2px',
                     pointerEvents: 'none',
                   }}
                 />
 
-                {/* Page-curl edge on right page */}
+                {/* Right page edge shadow */}
                 <div
                   style={{
                     position: 'absolute',
-                    top: 0,
-                    right: 0,
-                    bottom: 0,
+                    top: 0, right: 0, bottom: 0,
                     width: '2px',
-                    background: 'linear-gradient(to bottom, rgba(0,0,0,0.08), rgba(0,0,0,0.2), rgba(0,0,0,0.08))',
+                    background: 'linear-gradient(to bottom, rgba(78,52,32,0.06), rgba(78,52,32,0.14), rgba(78,52,32,0.06))',
                     borderRadius: '0 2px 2px 0',
                     pointerEvents: 'none',
                   }}
@@ -464,7 +493,8 @@ export function PreviewClient() {
                   width: i === currentSpread ? 20 : 6,
                   height: 6,
                   borderRadius: 3,
-                  background: i === currentSpread ? '#fdfaf5' : 'rgba(253,250,245,0.2)',
+                  // ✦ Sienna dots on cream
+                  background: i === currentSpread ? '#4E3420' : 'rgba(78,52,32,0.2)',
                   border: 'none',
                   cursor: 'pointer',
                   transition: 'all 0.3s ease',
@@ -481,12 +511,11 @@ export function PreviewClient() {
           disabled={currentSpread === total - 1}
           style={{
             width: 44, height: 44, borderRadius: '50%',
-            background: 'rgba(253,250,245,0.08)',
-            border: '1px solid rgba(253,250,245,0.15)',
-            color: currentSpread === total - 1 ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.7)',
+            background: 'rgba(78,52,32,0.06)',
+            border: '1px solid rgba(78,52,32,0.15)',
+            color: currentSpread === total - 1 ? 'rgba(78,52,32,0.2)' : 'rgba(78,52,32,0.7)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: currentSpread === total - 1 ? 'not-allowed' : 'pointer',
-            backdropFilter: 'blur(8px)',
             flexShrink: 0,
             transition: 'all 0.3s ease',
           }}
@@ -515,11 +544,11 @@ export function PreviewClient() {
               gap: 24,
               padding: '16px 24px',
               borderRadius: 8,
-              background: 'rgba(253, 250, 245, 0.85)',
+              background: 'rgba(253, 250, 245, 0.92)',
               backdropFilter: 'blur(20px)',
               WebkitBackdropFilter: 'blur(20px)',
               border: '1px solid rgba(78,52,32,0.12)',
-              boxShadow: '0 8px 40px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.2)',
+              boxShadow: '0 8px 40px rgba(78,52,32,0.14), 0 2px 8px rgba(78,52,32,0.08)',
               minWidth: 'min(90vw, 480px)',
             }}
           >
