@@ -90,6 +90,8 @@ export default function SmrithiDefinitiveAtelier() {
     else if (tRight) selectedElementInfo = { element: tRight, type: 'text', side: 'right' };
   }
   const handleExportSpreads = async () => {
+    const orderIdToSync = prompt("Enter the Order ID to sync to Google Cloud (or leave blank for local ZIP only):");
+
     try {
       const JSZip = (await import('jszip')).default;
       const { toJpeg } = await import('html-to-image');
@@ -97,44 +99,66 @@ export default function SmrithiDefinitiveAtelier() {
       const zip = new JSZip();
 
       const originalIndex = state.activeIndex;
-      
+      const spreadsToUpload: { filename: string, base64: string }[] = [];
+
+      document.body.style.cursor = 'wait';
+
       for (let i = 0; i < state.spreads.length; i++) {
         actions.setActiveIndex(i);
-        // Wait for React to render the new spread
         await new Promise(r => setTimeout(r, 400));
-        
+
         const node = document.getElementById('print-spread');
         if (!node) continue;
-        
+
         const dataUrl = await toJpeg(node, {
           canvasWidth: 4960,
           canvasHeight: 3508,
           quality: 1.0,
           pixelRatio: 1,
-          style: {
-            boxShadow: 'none',
-            borderRadius: '0'
-          },
+          style: { boxShadow: 'none', borderRadius: '0' },
           filter: (domNode) => {
             if (domNode instanceof HTMLElement) {
-              if (domNode.getAttribute('data-empty-frame') === 'true') {
-                return false;
-              }
+              if (domNode.getAttribute('data-empty-frame') === 'true') return false;
             }
             return true;
           }
         });
-        
+
         const base64Data = dataUrl.split(',')[1];
-        zip.file(`spread_${i + 1}_CMYK_READY_300DPI.jpg`, base64Data, { base64: true });
+        const filename = `spread_${i + 1}_CMYK_READY_300DPI.jpg`;
+
+        zip.file(filename, base64Data, { base64: true });
+
+        if (orderIdToSync) {
+          spreadsToUpload.push({ filename, base64: base64Data });
+        }
       }
 
       actions.setActiveIndex(originalIndex);
+
       const zipBlob = await zip.generateAsync({ type: 'blob' });
       saveAs(zipBlob, 'smrithi-print-ready.zip');
+
+      if (orderIdToSync && spreadsToUpload.length > 0) {
+        const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3002';
+        const res = await fetch(`${API_BASE}/api/orders/${orderIdToSync.trim()}/export`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ spreads: spreadsToUpload })
+        });
+
+        if (res.ok) {
+          alert("Successfully synced final layouts to Google Cloud Archival.");
+        } else {
+          alert("ZIP downloaded, but cloud sync failed. Check console.");
+        }
+      }
+
     } catch (e) {
       console.error('Export failed', e);
       alert('Export failed. Check console.');
+    } finally {
+      document.body.style.cursor = 'default';
     }
   };
 

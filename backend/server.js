@@ -97,6 +97,57 @@ async function sendNotificationEmail(orderId, metadata) {
   }
 }
 
+async function sendCustomerUploadEmail(metadata) {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS || !metadata.email) return;
+
+  const mailOptions = {
+    from: `"Smrithi Atelier" <${process.env.EMAIL_USER}>`,
+    to: metadata.email,
+    subject: `Smrithi Atelier: Photographs Received`,
+    html: `
+      <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 500px; margin: 0 auto; color: #1E0E06; line-height: 1.6;">
+        <h2 style="font-weight: 300; letter-spacing: 0.1em; color: #4E3420; text-transform: uppercase; font-size: 14px; border-bottom: 1px solid #eee; padding-bottom: 20px; margin-bottom: 30px;">
+          Smrithi Atelier
+        </h2>
+        <p style="font-size: 16px;">Hello,</p>
+        <p style="font-size: 16px;">We have securely received your collection for <em>${metadata.dest || 'your upcoming edition'}</em>.</p>
+        <p style="font-size: 16px;">The Atelier is currently reviewing the photographs and preparing the initial layouts. Our focus is on deliberate sequencing to ensure the narrative of your journey is preserved correctly.</p>
+        <p style="font-size: 16px;">We will notify you once the preview is ready for your review.</p>
+        <br/>
+        <p style="font-size: 14px; color: #888;">Warm regards,<br/>The Smrithi Team</p>
+      </div>
+    `,
+  };
+  try { await transporter.sendMail(mailOptions); } catch (e) { console.error(e); }
+}
+
+async function sendCustomerPaymentEmail(customerEmail) {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS || !customerEmail) return;
+
+  const mailOptions = {
+    from: `"Smrithi Atelier" <${process.env.EMAIL_USER}>`,
+    to: customerEmail,
+    subject: `Smrithi Atelier: Commission Confirmed`,
+    html: `
+      <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 500px; margin: 0 auto; color: #1E0E06; line-height: 1.6;">
+        <h2 style="font-weight: 300; letter-spacing: 0.1em; color: #4E3420; text-transform: uppercase; font-size: 14px; border-bottom: 1px solid #eee; padding-bottom: 20px; margin-bottom: 30px;">
+          Smrithi Atelier
+        </h2>
+        <p style="font-size: 16px;">Hello,</p>
+        <p style="font-size: 16px;">Your payment has been successfully secured. Your archival edition is now formally commissioned and entered into our production queue.</p>
+        <p style="font-size: 16px;">We will reach out shortly to schedule a brief consultation call. This ensures every detail of the layout aligns with your intentions before we begin the final binding process.</p>
+        <br/>
+        <p style="font-size: 14px; color: #888;">Warm regards,<br/>The Smrithi Team</p>
+      </div>
+    `,
+  };
+  try { await transporter.sendMail(mailOptions); } catch (e) { console.error(e); }
+}
+
+function generatePreviewCode() {
+  return crypto.randomBytes(3).toString('hex').toUpperCase();
+}
+
 // Generate a new Order ID
 app.post('/api/orders', (req, res) => {
   const orderId = crypto.randomUUID(); // <--- CHANGE TO THIS
@@ -157,20 +208,25 @@ app.post('/api/create-order', async (req, res) => {
 });
 
 // 2. Verify Payment Signature
-app.post('/api/verify-payment', (req, res) => {
-  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
-
+app.post('/api/verify-payment', async (req, res) => {
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature, orderId, customer_email } = req.body;
   const sign = razorpay_order_id + "|" + razorpay_payment_id;
-  const expectedSign = crypto
-    .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-    .update(sign.toString())
-    .digest("hex");
+  const expectedSign = crypto.createHmac("sha256", process.env.RAZORPAY_KEY_SECRET).update(sign).digest("hex");
 
   if (razorpay_signature === expectedSign) {
-    console.log(`Payment Verified for Order: ${razorpay_order_id}`);
-    res.json({ success: true, message: "Payment verified successfully" });
+    if (orderId) {
+      try {
+        const metaFile = storage.bucket(bucketName).file(`orders/${orderId}/metadata.json`);
+        const [metaContent] = await metaFile.download();
+        const metadata = JSON.parse(metaContent.toString());
+        metadata.status = "paid";
+        metadata.paymentId = razorpay_payment_id;
+        await metaFile.save(JSON.stringify(metadata, null, 2), { contentType: 'application/json' });
+      } catch (err) { console.error(err); }
+    }
+    if (customer_email) await sendCustomerPaymentEmail(customer_email);
+    res.json({ success: true, message: "Payment verified" });
   } else {
-    console.error("Payment Verification Failed: Invalid Signature");
     res.status(400).json({ success: false, error: "Invalid signature" });
   }
 });
@@ -216,6 +272,7 @@ app.post('/api/orders/:orderId/metadata', async (req, res) => {
     console.log(`Metadata saved for Order: ${orderId}`);
 
     await sendNotificationEmail(orderId, metadata);
+    await sendCustomerUploadEmail(metadata);
 
     res.json({ success: true });
   } catch (error) {
@@ -233,6 +290,109 @@ app.get('/api/orders/:orderId/metadata', async (req, res) => {
     res.json(JSON.parse(content.toString()));
   } catch (error) {
     res.json({});
+  }
+});
+
+// Ops Engine Export — uploads final spreads, generates preview code, emails client
+app.post('/api/orders/:orderId/export', async (req, res) => {
+  const { orderId } = req.params;
+  const { spreads } = req.body;
+
+  if (!spreads || !Array.isArray(spreads)) return res.status(400).json({ error: 'Invalid payload.' });
+
+  try {
+    const uploadPromises = spreads.map(async (spread) => {
+      const buffer = Buffer.from(spread.base64, 'base64');
+      const file = storage.bucket(bucketName).file(`orders/${orderId}/final/${spread.filename}`);
+      await file.save(buffer, { contentType: 'image/jpeg' });
+    });
+    await Promise.all(uploadPromises);
+
+    const metaFile = storage.bucket(bucketName).file(`orders/${orderId}/metadata.json`);
+    const [metaContent] = await metaFile.download();
+    const metadata = JSON.parse(metaContent.toString());
+
+    const previewCode = generatePreviewCode();
+    metadata.previewCode = previewCode;
+    metadata.status = "preview_ready";
+    await metaFile.save(JSON.stringify(metadata, null, 2), { contentType: 'application/json' });
+
+    const pointerFile = storage.bucket(bucketName).file(`previews/${previewCode}.json`);
+    await pointerFile.save(JSON.stringify({ orderId }), { contentType: 'application/json' });
+
+    if (metadata.email) {
+      const mailOptions = {
+        from: `"Smrithi Atelier" <${process.env.EMAIL_USER}>`,
+        to: metadata.email,
+        subject: `Smrithi Atelier: Your Edition is Ready for Review`,
+        html: `
+          <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 500px; margin: 0 auto; color: #1E0E06; line-height: 1.6;">
+            <h2 style="font-weight: 300; letter-spacing: 0.1em; color: #4E3420; text-transform: uppercase; font-size: 14px; border-bottom: 1px solid #eee; padding-bottom: 20px; margin-bottom: 30px;">
+              Smrithi Atelier
+            </h2>
+            <p style="font-size: 16px;">Hello,</p>
+            <p style="font-size: 16px;">The curation of your journey is complete. We have prepared a digital proof of your archival edition for your review.</p>
+            <p style="font-size: 16px;">You may view your layout by entering your secure access code on our portal.</p>
+            <div style="background: #fdfaf5; padding: 20px; border: 1px solid #eee; text-align: center; margin: 30px 0;">
+              <p style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: #888; margin-top: 0;">Access Code</p>
+              <h1 style="font-weight: 400; letter-spacing: 0.2em; color: #4E3420; margin: 0;">${previewCode}</h1>
+            </div>
+            <p style="font-size: 14px; color: #888;">Warm regards,<br/>The Smrithi Team</p>
+          </div>
+        `,
+      };
+      await transporter.sendMail(mailOptions);
+    }
+    res.json({ success: true, previewCode });
+  } catch (error) {
+    console.error('Export error:', error);
+    res.status(500).json({ error: 'Failed to export.' });
+  }
+});
+
+// Client Preview Lookup — reads pointer file, returns signed spread URLs
+app.get('/api/preview/:code', async (req, res) => {
+  const cleanCode = req.params.code.toUpperCase().trim();
+  try {
+    const pointerFile = storage.bucket(bucketName).file(`previews/${cleanCode}.json`);
+    const [pointerExists] = await pointerFile.exists();
+    if (!pointerExists) return res.status(404).json({ error: 'Invalid access code.' });
+
+    const [pointerContent] = await pointerFile.download();
+    const { orderId } = JSON.parse(pointerContent.toString());
+
+    const metaFile = storage.bucket(bucketName).file(`orders/${orderId}/metadata.json`);
+    const [metaContent] = await metaFile.download();
+    const metadata = JSON.parse(metaContent.toString());
+
+    const [files] = await storage.bucket(bucketName).getFiles({ prefix: `orders/${orderId}/final/` });
+    const urls = await Promise.all(files.map(async (file) => {
+      const [url] = await file.getSignedUrl({ version: 'v4', action: 'read', expires: Date.now() + 60 * 60 * 1000 });
+      return { name: file.name.split('/').pop(), url };
+    }));
+
+    res.json({ orderId, metadata, spreads: urls.sort((a, b) => a.name.localeCompare(b.name)) });
+  } catch (error) {
+    console.error('Preview lookup error:', error);
+    res.status(500).json({ error: 'Failed to retrieve preview.' });
+  }
+});
+
+// Admin Ledger — returns all orders and statuses from GCS
+app.get('/api/admin/orders', async (req, res) => {
+  try {
+    const [files] = await storage.bucket(bucketName).getFiles({ prefix: 'orders/' });
+    const metadataFiles = files.filter(file => file.name.endsWith('metadata.json'));
+    const orders = await Promise.all(metadataFiles.map(async (file) => {
+      const [content] = await file.download();
+      const meta = JSON.parse(content.toString());
+      const orderId = file.name.split('/')[1];
+      return { orderId, ...meta };
+    }));
+    res.json({ orders });
+  } catch (error) {
+    console.error('Ledger error:', error);
+    res.status(500).json({ error: 'Failed to fetch ledger' });
   }
 });
 

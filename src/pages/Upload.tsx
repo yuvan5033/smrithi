@@ -270,7 +270,7 @@ export function Upload() {
           title: <>Let's craft your<br />very own <span className="relative inline-block"><em className="italic text-[var(--sienna)] relative z-10 pr-2">edition</em><div className="absolute bottom-[0.1em] left-[-2%] w-[104%] h-[1px] bg-[var(--sienna)] rotate-[-1.5deg] rounded-full z-0 opacity-50"></div></span></>,
           progressText: "getting started",
           content: (
-            <div className="flex flex-col gap-10 mt-12 w-full">
+            <div className="flex flex-col gap-8 mt-12 w-full">
               <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.7, ease: [0.16, 1, 0.3, 1] }} className="flex flex-col gap-2">
                 <label className="text-[0.8rem] font-jost text-[var(--ink-80)] mb-1">What does the trip mean to you?</label>
                 <input
@@ -283,17 +283,32 @@ export function Upload() {
                   autoFocus
                 />
               </motion.div>
-              <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.7, ease: [0.16, 1, 0.3, 1] }} className="flex flex-col gap-2">
-                <label className="text-[0.8rem] font-jost text-[var(--ink-80)] mb-1">Your mobile number</label>
-                <input
-                  type="tel"
-                  placeholder="+91 ..."
-                  className="bg-transparent border-0 border-b-[1px] border-[var(--border)] py-2 text-[1.1rem] font-jost text-[var(--ink)] outline-none focus:border-[var(--sienna)] transition-colors placeholder:text-[var(--ink-35)] w-full"
-                  value={form.mobile || ''}
-                  onChange={e => updateForm('mobile', e.target.value)}
-                  onKeyDown={handleKeyDown}
-                />
-              </motion.div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.7, ease: [0.16, 1, 0.3, 1] }} className="flex flex-col gap-2">
+                  <label className="text-[0.8rem] font-jost text-[var(--ink-80)] mb-1">Your mobile number</label>
+                  <input
+                    type="tel"
+                    placeholder="+91 ..."
+                    className="bg-transparent border-0 border-b-[1px] border-[var(--border)] py-2 text-[1.1rem] font-jost text-[var(--ink)] outline-none focus:border-[var(--sienna)] transition-colors placeholder:text-[var(--ink-35)] w-full"
+                    value={form.mobile || ''}
+                    onChange={e => updateForm('mobile', e.target.value)}
+                    onKeyDown={handleKeyDown}
+                  />
+                </motion.div>
+
+                <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.7, ease: [0.16, 1, 0.3, 1] }} className="flex flex-col gap-2">
+                  <label className="text-[0.8rem] font-jost text-[var(--ink-80)] mb-1">Your email address</label>
+                  <input
+                    type="email"
+                    placeholder="For edition updates"
+                    className="bg-transparent border-0 border-b-[1px] border-[var(--border)] py-2 text-[1.1rem] font-jost text-[var(--ink)] outline-none focus:border-[var(--sienna)] transition-colors placeholder:text-[var(--ink-35)] w-full"
+                    value={form.email || ''}
+                    onChange={e => updateForm('email', e.target.value)}
+                    onKeyDown={handleKeyDown}
+                  />
+                </motion.div>
+              </div>
             </div>
           )
         };
