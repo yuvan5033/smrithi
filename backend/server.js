@@ -304,21 +304,33 @@ app.post('/api/orders/:orderId/export/init', async (req, res) => {
 
   try {
     const metaFile = storage.bucket(bucketName).file(`orders/${orderId}/metadata.json`);
-    const [metaContent] = await metaFile.download();
-    const metadata = JSON.parse(metaContent.toString());
+    const [exists] = await metaFile.exists();
+    
+    let metadata = {};
+    if (exists) {
+      const [metaContent] = await metaFile.download();
+      metadata = JSON.parse(metaContent.toString());
+    } else {
+      console.warn(`Metadata not found for order ${orderId}, using empty object.`);
+    }
 
     const previewCode = generatePreviewCode();
 
     // Generate Direct Upload URLs for Google Cloud
     const uploadUrls = await Promise.all(filenames.map(async (filename) => {
       const file = storage.bucket(bucketName).file(`preview/${previewCode}/preview_folder/${filename}`);
-      const [url] = await file.getSignedUrl({
-        version: 'v4',
-        action: 'write',
-        expires: Date.now() + 60 * 60 * 1000, // 1 hour
-        contentType: 'image/jpeg'
-      });
-      return { filename, url };
+      try {
+        const [url] = await file.getSignedUrl({
+          version: 'v4',
+          action: 'write',
+          expires: Date.now() + 60 * 60 * 1000, // 1 hour
+          contentType: 'image/jpeg'
+        });
+        return { filename, url };
+      } catch (err) {
+        console.error(`Error generating signed URL for ${filename}:`, err);
+        throw err;
+      }
     }));
 
     // Save Pointer File
@@ -333,8 +345,8 @@ app.post('/api/orders/:orderId/export/init', async (req, res) => {
 
     res.json({ success: true, previewCode, uploadUrls });
   } catch (error) {
-    console.error('Export Init Error:', error);
-    res.status(500).json({ error: 'Failed to initialize export.' });
+    console.error('Export Init Error Details:', error);
+    res.status(500).json({ error: 'Failed to initialize export.', details: error.message });
   }
 });
 
