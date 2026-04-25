@@ -94,8 +94,8 @@ export function Preview() {
 
           const verifyData = await verifyResponse.json();
           if (verifyData.success) {
-            // Payment successful! Proceed to the upload/metadata flow
-            navigate('/upload');
+            // Payment successful! Send them to the thank you page
+            navigate('/success');
           } else {
             alert('Payment verification failed. Please contact support.');
           }
@@ -142,8 +142,8 @@ export function Preview() {
           <button
             key={v}
             className={`px-5 py-2.5 text-[0.62rem] tracking-[0.2em] uppercase cursor-pointer font-jost font-light transition-all duration-200 border ${view === v
-                ? 'bg-[var(--sienna)] text-[var(--cream)] border-[var(--sienna)]'
-                : 'border-[var(--border)] bg-transparent text-[var(--ink-60)]'
+              ? 'bg-[var(--sienna)] text-[var(--cream)] border-[var(--sienna)]'
+              : 'border-[var(--border)] bg-transparent text-[var(--ink-60)]'
               }`}
             onClick={() => setView(v)}
           >
@@ -228,8 +228,8 @@ export function Preview() {
               <button
                 key={font.id}
                 className={`p-3 px-4 border cursor-pointer text-left bg-none transition-all duration-200 ${fontStyle === font.id
-                    ? 'border-[var(--sienna)] bg-[rgba(78,52,32,0.03)]'
-                    : 'border-[var(--border)] hover:border-[var(--sienna)]'
+                  ? 'border-[var(--sienna)] bg-[rgba(78,52,32,0.03)]'
+                  : 'border-[var(--border)] hover:border-[var(--sienna)]'
                   }`}
                 onClick={() => setFontStyle(font.id)}
               >

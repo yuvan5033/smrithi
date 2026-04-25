@@ -12,6 +12,7 @@ import { Gallery } from './pages/Gallery';
 import { FAQ } from './pages/FAQ';
 import { Upload } from './pages/Upload';
 import { Preview } from './pages/Preview';
+import { Success } from './pages/Success';
 import SmrithiDefinitiveAtelier from './pages/ops';
 
 function AppContent() {
@@ -25,7 +26,7 @@ function AppContent() {
     <div className="relative">
       <ScrollToTop />
       <GrainOverlay />
-      
+
       <Navigation />
 
       <Routes>
@@ -79,6 +80,9 @@ function AppContent() {
             <hr className="border-none border-t border-[var(--border)] m-0" />
             <Footer />
           </>
+        } />
+        <Route path="/success" element={
+          <Success />
         } />
       </Routes>
     </div>
