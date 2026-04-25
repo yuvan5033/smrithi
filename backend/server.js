@@ -295,48 +295,59 @@ app.get('/api/orders/:orderId/metadata', async (req, res) => {
   }
 });
 
-// Ops Engine Export — new path: preview/CODE/CODE.json + preview/CODE/preview_folder/
-app.post('/api/orders/:orderId/export', async (req, res) => {
+// 1. Ops Engine Export - Initialization (Creates code & signed URLs)
+app.post('/api/orders/:orderId/export/init', async (req, res) => {
   const { orderId } = req.params;
-  const { spreads } = req.body;
+  const { filenames } = req.body;
 
-  if (!spreads || !Array.isArray(spreads)) return res.status(400).json({ error: 'Invalid payload.' });
+  if (!filenames || !Array.isArray(filenames)) return res.status(400).json({ error: 'Invalid payload.' });
 
   try {
-    // 1. Read order metadata to get client email + dest
     const metaFile = storage.bucket(bucketName).file(`orders/${orderId}/metadata.json`);
     const [metaContent] = await metaFile.download();
     const metadata = JSON.parse(metaContent.toString());
 
-    // 2. Generate the preview code
     const previewCode = generatePreviewCode();
 
-    // 3. Upload final spread images to preview/CODE/preview_folder/
-    const uploadPromises = spreads.map(async (spread) => {
-      const buffer = Buffer.from(spread.base64, 'base64');
-      const file = storage.bucket(bucketName).file(`preview/${previewCode}/preview_folder/${spread.filename}`);
-      await file.save(buffer, { contentType: 'image/jpeg' });
-    });
-    await Promise.all(uploadPromises);
+    // Generate Direct Upload URLs for Google Cloud
+    const uploadUrls = await Promise.all(filenames.map(async (filename) => {
+      const file = storage.bucket(bucketName).file(`preview/${previewCode}/preview_folder/${filename}`);
+      const [url] = await file.getSignedUrl({
+        version: 'v4',
+        action: 'write',
+        expires: Date.now() + 60 * 60 * 1000, // 1 hour
+        contentType: 'image/jpeg'
+      });
+      return { filename, url };
+    }));
 
-    // 4. Write the pointer JSON: preview/CODE/CODE.json
-    const pointerPayload = {
-      orderId,
-      previewCode,
-      dest: metadata.dest || '',
-      status: 'preview_ready',
-      generatedAt: new Date().toISOString(),
-    };
+    // Save Pointer File
+    const pointerPayload = { orderId, previewCode, dest: metadata.dest || '', status: 'preview_ready', generatedAt: new Date().toISOString() };
     const pointerFile = storage.bucket(bucketName).file(`preview/${previewCode}/${previewCode}.json`);
     await pointerFile.save(JSON.stringify(pointerPayload, null, 2), { contentType: 'application/json' });
 
-    // 5. Update order metadata with previewCode and status
+    // Update Metadata
     metadata.previewCode = previewCode;
     metadata.status = 'preview_ready';
     await metaFile.save(JSON.stringify(metadata, null, 2), { contentType: 'application/json' });
 
-    // 6. Email the client their access code
-    if (metadata.email) {
+    res.json({ success: true, previewCode, uploadUrls });
+  } catch (error) {
+    console.error('Export Init Error:', error);
+    res.status(500).json({ error: 'Failed to initialize export.' });
+  }
+});
+
+// 2. Ops Engine Export - Completion (Fires the Email)
+app.post('/api/orders/:orderId/export/complete', async (req, res) => {
+  const { orderId } = req.params;
+
+  try {
+    const metaFile = storage.bucket(bucketName).file(`orders/${orderId}/metadata.json`);
+    const [metaContent] = await metaFile.download();
+    const metadata = JSON.parse(metaContent.toString());
+
+    if (metadata.email && metadata.previewCode) {
       const mailOptions = {
         from: `"Smrithi Atelier" <${process.env.EMAIL_USER}>`,
         to: metadata.email,
@@ -351,7 +362,7 @@ app.post('/api/orders/:orderId/export', async (req, res) => {
             <p style="font-size: 16px;">You may view your layout by entering your secure access code on our portal.</p>
             <div style="background: #fdfaf5; padding: 20px; border: 1px solid #eee; text-align: center; margin: 30px 0;">
               <p style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: #888; margin-top: 0;">Access Code</p>
-              <h1 style="font-weight: 400; letter-spacing: 0.2em; color: #4E3420; margin: 0;">${previewCode}</h1>
+              <h1 style="font-weight: 400; letter-spacing: 0.2em; color: #4E3420; margin: 0;">${metadata.previewCode}</h1>
             </div>
             <p style="font-size: 14px; color: #888;">Warm regards,<br/>The Smrithi Team</p>
           </div>
@@ -359,12 +370,10 @@ app.post('/api/orders/:orderId/export', async (req, res) => {
       };
       await transporter.sendMail(mailOptions);
     }
-
-    console.log(`Export complete. Preview code: ${previewCode} | Order: ${orderId}`);
-    res.json({ success: true, previewCode });
+    res.json({ success: true });
   } catch (error) {
-    console.error('Export error:', error);
-    res.status(500).json({ error: 'Failed to export.' });
+    console.error('Export Complete Error:', error);
+    res.status(500).json({ error: 'Failed to complete export.' });
   }
 });
 

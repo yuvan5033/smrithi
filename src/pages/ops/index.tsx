@@ -91,6 +91,7 @@ export default function SmrithiDefinitiveAtelier() {
   }
   const handleExportSpreads = async () => {
     const orderIdToSync = prompt("Enter the Order ID to sync to Google Cloud (or leave blank for local ZIP only):");
+    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3002';
 
     try {
       const JSZip = (await import('jszip')).default;
@@ -99,13 +100,31 @@ export default function SmrithiDefinitiveAtelier() {
       const zip = new JSZip();
 
       const originalIndex = state.activeIndex;
-      const spreadsToUpload: { filename: string, base64: string }[] = [];
+      
+      let uploadUrls: any[] = [];
+      let previewCode = 'N/A';
+
+      // 1. Initialize Cloud Export (Get Signed URLs)
+      if (orderIdToSync) {
+        const filenames = state.spreads.map((_, i) => `spread_${i + 1}_CMYK_READY_300DPI.jpg`);
+        const initRes = await fetch(`${API_BASE}/api/orders/${orderIdToSync.trim()}/export/init`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filenames })
+        });
+        
+        if (!initRes.ok) throw new Error("Failed to initialize cloud export.");
+        const data = await initRes.json();
+        uploadUrls = data.uploadUrls;
+        previewCode = data.previewCode;
+      }
 
       document.body.style.cursor = 'wait';
 
+      // 2. Generate Images and Upload
       for (let i = 0; i < state.spreads.length; i++) {
         actions.setActiveIndex(i);
-        await new Promise(r => setTimeout(r, 400));
+        await new Promise(r => setTimeout(r, 400)); // Let React render the DOM
 
         const node = document.getElementById('print-spread');
         if (!node) continue;
@@ -127,57 +146,48 @@ export default function SmrithiDefinitiveAtelier() {
         const base64Data = dataUrl.split(',')[1];
         const filename = `spread_${i + 1}_CMYK_READY_300DPI.jpg`;
 
+        // Add to Local ZIP
         zip.file(filename, base64Data, { base64: true });
 
-        if (orderIdToSync) {
-          spreadsToUpload.push({ filename, base64: base64Data });
+        // Direct Upload to Google Cloud (Bypass Vercel payload limit)
+        if (orderIdToSync && uploadUrls.length > 0) {
+          const urlObj = uploadUrls.find(u => u.filename === filename);
+          if (urlObj) {
+            // Convert dataUrl to binary Blob for extremely fast uploading
+            const blob = await (await fetch(dataUrl)).blob();
+            await fetch(urlObj.url, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'image/jpeg' },
+              body: blob
+            });
+          }
         }
       }
 
       actions.setActiveIndex(originalIndex);
 
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
-      saveAs(zipBlob, 'smrithi-print-ready.zip');
+      // 3. Complete Cloud Export (Trigger Email)
+      if (orderIdToSync) {
+        await fetch(`${API_BASE}/api/orders/${orderIdToSync.trim()}/export/complete`, { method: 'POST' });
+        
+        // Add Reference Text to ZIP
+        const refText = [
+          'SMRITHI ATELIER — PRINT ARCHIVE',
+          '================================',
+          `Order ID    : ${orderIdToSync.trim()}`,
+          `Preview Code: ${previewCode}`,
+          `Exported At : ${new Date().toISOString()}`,
+          '',
+          'Client preview URL:',
+          `${window.location.origin}/preview`
+        ].join('\n');
+        zip.file('SMRITHI_REFERENCE.txt', refText);
 
-      if (orderIdToSync && spreadsToUpload.length > 0) {
-        const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3002';
-        const res = await fetch(`${API_BASE}/api/orders/${orderIdToSync.trim()}/export`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ spreads: spreadsToUpload })
-        });
+        const updatedZipBlob = await zip.generateAsync({ type: 'blob' });
+        saveAs(updatedZipBlob, 'smrithi-print-ready.zip');
 
-        if (res.ok) {
-          const result = await res.json();
-          const previewCode = result.previewCode || 'N/A';
-
-          // Add reference text file to the ZIP
-          const refText = [
-            'SMRITHI ATELIER — PRINT ARCHIVE',
-            '================================',
-            '',
-            `Order ID    : ${orderIdToSync.trim()}`,
-            `Preview Code: ${previewCode}`,
-            `Exported At : ${new Date().toISOString()}`,
-            '',
-            'Client preview URL:',
-            `${window.location.origin}/preview`,
-            '',
-            'Enter the Preview Code above on the preview page to view the digital proof.',
-          ].join('\n');
-
-          zip.file('SMRITHI_REFERENCE.txt', refText);
-
-          // Re-generate the ZIP with the reference file included
-          const updatedZipBlob = await zip.generateAsync({ type: 'blob' });
-          saveAs(updatedZipBlob, 'smrithi-print-ready.zip');
-
-          alert(`Cloud sync complete.\n\nPreview Code: ${previewCode}\n\nThe client can view their edition at /preview using this code.`);
-        } else {
-          alert('ZIP downloaded, but cloud sync failed. Check console.');
-        }
+        alert(`Cloud sync complete!\n\nPreview Code: ${previewCode}\nThe client has been emailed their access code.`);
       } else {
-        // No order ID — just download the ZIP as-is
         const zipBlob = await zip.generateAsync({ type: 'blob' });
         saveAs(zipBlob, 'smrithi-print-ready.zip');
       }
