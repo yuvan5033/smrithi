@@ -7,14 +7,17 @@ interface SEOProps {
   ogTitle?: string;
   ogDescription?: string;
   noIndex?: boolean;
+  /** When true, the hook does nothing — used for components that appear as sections on other pages */
+  skip?: boolean;
 }
 
 /**
  * Sets per-page SEO meta tags dynamically for SPA routing.
  * Updates document title, meta description, canonical URL, and Open Graph tags.
  */
-export function useSEO({ title, description, canonical, ogTitle, ogDescription, noIndex = false }: SEOProps) {
+export function useSEO({ title, description, canonical, ogTitle, ogDescription, noIndex = false, skip = false }: SEOProps) {
   useEffect(() => {
+    if (skip) return;
     // Title
     document.title = title;
 
@@ -81,5 +84,5 @@ export function useSEO({ title, description, canonical, ogTitle, ogDescription, 
         ? 'noindex, nofollow'
         : 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1';
     }
-  }, [title, description, canonical, ogTitle, ogDescription, noIndex]);
+  }, [title, description, canonical, ogTitle, ogDescription, noIndex, skip]);
 }

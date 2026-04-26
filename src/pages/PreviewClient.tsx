@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useSEO } from '../hooks/useSEO';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -53,34 +53,6 @@ function loadRazorpayScript(): Promise<boolean> {
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3002';
 const EASE = [0.16, 1, 0.3, 1] as const;
 
-// ─── Page-turn animation variants ────────────────────────────────────────────
-//
-// Uses rotateY on a perspective container to simulate a book page turning.
-// Forward  (dir=1):  new page sweeps in from the right (rotateY 90 → 0)
-//                    old page sweeps out to the left   (rotateY 0 → -90)
-// Backward (dir=-1): new page sweeps in from the left  (rotateY -90 → 0)
-//                    old page sweeps out to the right  (rotateY 0 → 90)
-
-const pageTurnVariants = {
-  enter: (dir: number) => ({
-    rotateY: dir > 0 ? 90 : -90,
-    opacity: 0,
-    scale: 0.97,
-  }),
-  center: {
-    rotateY: 0,
-    opacity: 1,
-    scale: 1,
-    transition: { duration: 0.55, ease: EASE },
-  },
-  exit: (dir: number) => ({
-    rotateY: dir > 0 ? -90 : 90,
-    opacity: 0,
-    scale: 0.97,
-    transition: { duration: 0.3, ease: [0.4, 0, 1, 1] },
-  }),
-};
-
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function PreviewClient() {
@@ -100,12 +72,23 @@ export function PreviewClient() {
   const [direction, setDirection] = useState(1);
   const [showPayment, setShowPayment] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  // Touch/swipe refs
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+  const isSwiping = useRef(false);
 
   useEffect(() => {
     if (viewState !== 'preview') return;
     const t = setTimeout(() => setShowPayment(true), 4000);
     return () => clearTimeout(t);
   }, [viewState]);
+
+  // Reset image loaded state when spread changes
+  useEffect(() => {
+    setImageLoaded(false);
+  }, [currentSpread]);
 
   // ─── Fetch ─────────────────────────────────────────────────────────────────
 
@@ -126,7 +109,7 @@ export function PreviewClient() {
       }
       const data: OrderData = await res.json();
 
-      // ✦ Sort spreads by number in filename so spread_1 always comes first
+      // Sort spreads by number in filename so spread_1 always comes first
       data.spreads = sortSpreads(data.spreads);
 
       setOrderData(data);
@@ -152,6 +135,7 @@ export function PreviewClient() {
     setCurrentSpread((s) => s - 1);
   }, [currentSpread]);
 
+  // Keyboard navigation
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (viewState !== 'preview') return;
@@ -161,6 +145,24 @@ export function PreviewClient() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [viewState, goNext, goPrev]);
+
+  // Touch/swipe handlers for mobile
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    isSwiping.current = false;
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    const dy = e.changedTouches[0].clientY - touchStartY.current;
+
+    // Only trigger if horizontal swipe is dominant and significant enough
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (dx < 0) goNext();
+      else goPrev();
+    }
+  }, [goNext, goPrev]);
 
   // ─── Payment ───────────────────────────────────────────────────────────────
 
@@ -233,7 +235,7 @@ export function PreviewClient() {
 
   if (viewState === 'gate' || viewState === 'loading') {
     return (
-      <div className="min-h-[100dvh] flex flex-col items-center justify-center px-8 bg-[#fdfaf5]">
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6 sm:px-8 bg-[#fdfaf5]">
         {/* Decorative background */}
         <div className="fixed inset-0 pointer-events-none overflow-hidden opacity-25">
           <svg className="absolute right-[-20%] top-[-10%] w-[80%] h-auto stroke-[var(--border)]" viewBox="0 0 100 100" fill="none">
@@ -249,15 +251,15 @@ export function PreviewClient() {
           transition={{ duration: 0.9, ease: EASE }}
           className="w-full max-w-[420px] flex flex-col items-center text-center"
         >
-          <div className="text-[0.65rem] tracking-[0.2em] font-light uppercase font-jost text-[var(--ink-80)] mb-12">
+          <div className="text-[0.65rem] tracking-[0.2em] font-light uppercase font-jost text-[var(--ink-80)] mb-10 sm:mb-12">
             — smrithi atelier
           </div>
 
-          <h1 className="font-cormorant text-[clamp(2.2rem,5vw,3.5rem)] font-light text-[var(--ink)] leading-[1.1] mb-4">
+          <h1 className="font-cormorant text-[clamp(2rem,5vw,3.5rem)] font-light text-[var(--ink)] leading-[1.1] mb-4">
             Your edition<br />
             <em className="italic text-[var(--sienna)]">awaits.</em>
           </h1>
-          <p className="font-jost text-[0.85rem] text-[var(--ink-60)] leading-relaxed mb-12 max-w-[320px]">
+          <p className="font-jost text-[0.85rem] text-[var(--ink-60)] leading-relaxed mb-10 sm:mb-12 max-w-[320px]">
             Enter the access code we sent you to view your curated book preview.
           </p>
 
@@ -274,19 +276,7 @@ export function PreviewClient() {
                 setError(null);
               }}
               onKeyDown={(e) => e.key === 'Enter' && handleFetch()}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                borderBottom: '1px solid var(--border)',
-                padding: '12px 0',
-                fontSize: '1.6rem',
-                letterSpacing: '0.4em',
-                color: 'var(--ink)',
-                textAlign: 'center',
-                outline: 'none',
-                fontFamily: '"Cormorant Garamond", serif',
-                width: '100%',
-              }}
+              className="bg-transparent border-0 border-b border-[var(--border)] py-3 text-[1.6rem] tracking-[0.4em] text-[var(--ink)] text-center outline-none font-cormorant w-full focus:border-[var(--sienna)] transition-colors"
             />
 
             {error && (
@@ -302,21 +292,7 @@ export function PreviewClient() {
             <button
               onClick={handleFetch}
               disabled={viewState === 'loading'}
-              style={{
-                marginTop: 8,
-                padding: '14px 32px',
-                background: '#4E3420',
-                color: '#fdfaf5',
-                border: 'none',
-                borderRadius: 2,
-                fontSize: '0.7rem',
-                letterSpacing: '0.2em',
-                textTransform: 'uppercase',
-                fontFamily: '"Jost", sans-serif',
-                cursor: viewState === 'loading' ? 'wait' : 'pointer',
-                opacity: viewState === 'loading' ? 0.6 : 1,
-                transition: 'all 0.3s ease',
-              }}
+              className="mt-2 py-3.5 px-8 bg-[#4E3420] text-[#fdfaf5] border-none rounded-sm text-[0.7rem] tracking-[0.2em] uppercase font-jost transition-all duration-300 hover:bg-[#3A2414] disabled:opacity-60 disabled:cursor-wait active:scale-[0.98]"
             >
               {viewState === 'loading' ? 'Opening your edition…' : 'View My Edition'}
             </button>
@@ -330,268 +306,333 @@ export function PreviewClient() {
 
   const spread = orderData!.spreads[currentSpread];
   const total = orderData!.spreads.length;
+  const isFirst = currentSpread === 0;
+  const isLast = currentSpread === total - 1;
 
   return (
     <div
-      style={{
-        minHeight: '100dvh',
-        // ✦ Warm cream — no dark background
-        background: '#fdfaf5',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        position: 'relative',
-        overflow: 'hidden',
-        paddingTop: 72,
-        paddingBottom: showPayment ? 100 : 40,
-        transition: 'padding-bottom 0.5s ease',
-      }}
+      className="min-h-[100dvh] bg-[#fdfaf5] flex flex-col relative overflow-hidden select-none"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
     >
-      {/* ── Top bar ── */}
+      {/* ── Main content — image pushed ~20% higher ── */}
       <div
+        className="flex-1 flex flex-col items-center px-0 sm:px-6 md:px-12 relative"
         style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 50,
-          padding: '16px 32px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          // ✦ Light bar on cream, no dark gradient
-          background: 'rgba(253,250,245,0.9)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          borderBottom: '1px solid rgba(78,52,32,0.08)',
+          /* Push content upward: more top padding, less bottom */
+          paddingTop: 'max(24px, 5vh)',
+          paddingBottom: showPayment ? 'max(100px, 14vh)' : 'max(24px, 4vh)',
+          justifyContent: 'flex-start',
         }}
       >
-        <div style={{ fontSize: '0.6rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: 'rgba(78,52,32,0.5)', fontFamily: '"Jost", sans-serif' }}>
-          Smrithi Atelier
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-          <div style={{ fontSize: '0.65rem', color: 'var(--sienna)', fontFamily: '"Cormorant Garamond", serif', letterSpacing: '0.05em' }}>
-            {orderData!.metadata.dest || 'Your Edition'}{orderData!.metadata.dates ? ` · ${orderData!.metadata.dates}` : ''}
-          </div>
-          <div style={{ fontSize: '0.55rem', color: 'rgba(78,52,32,0.35)', fontFamily: '"Jost", sans-serif', letterSpacing: '0.1em' }}>
-            {currentSpread + 1} / {total}
-          </div>
-        </div>
-      </div>
+        {/* Spacer — pushes the book ~20% from top instead of dead center */}
+        <div style={{ flex: '0.25' }} />
 
-      {/* ── Book spread ── */}
-      <div style={{ width: '100%', maxWidth: '90vw', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 24 }}>
+        {/* Desktop nav + Book row */}
+        <div className="flex items-center justify-center w-full max-w-[1100px] mx-auto">
 
-        {/* Prev button */}
-        <button
-          onClick={goPrev}
-          disabled={currentSpread === 0}
-          style={{
-            width: 44, height: 44, borderRadius: '50%',
-            // ✦ Warm ink tones on light bg
-            background: 'rgba(78,52,32,0.06)',
-            border: '1px solid rgba(78,52,32,0.15)',
-            color: currentSpread === 0 ? 'rgba(78,52,32,0.2)' : 'rgba(78,52,32,0.7)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: currentSpread === 0 ? 'not-allowed' : 'pointer',
-            flexShrink: 0,
-            transition: 'all 0.3s ease',
-          }}
-        >
-          <ArrowLeft size={18} />
-        </button>
-
-        {/* Spread image — perspective container enables 3D page-turn */}
-        <div style={{ position: 'relative', flex: 1, maxWidth: '80vw', perspective: '1400px' }}>
-          <AnimatePresence mode="wait" custom={direction}>
-            <motion.div
-              key={currentSpread}
-              custom={direction}
-              variants={pageTurnVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              // ✦ Transform origin at the spine edge for realistic page-turn feel
-              style={{
-                position: 'relative',
-                transformOrigin: direction > 0 ? 'left center' : 'right center',
-                willChange: 'transform, opacity',
-              }}
-            >
-              {/* Book shadow wrapper — warm shadows, not black */}
-              <div
-                style={{
-                  position: 'relative',
-                  boxShadow: '0 20px 60px rgba(78,52,32,0.18), 0 4px 16px rgba(78,52,32,0.10)',
-                  borderRadius: 2,
-                }}
-              >
-                <img
-                  src={spread.url}
-                  alt={`Spread ${currentSpread + 1}`}
-                  style={{
-                    width: '100%',
-                    height: 'auto',
-                    display: 'block',
-                    borderRadius: 2,
-                  }}
-                  draggable={false}
-                />
-
-                {/* Spine gutter crease overlay */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    pointerEvents: 'none',
-                    background: `
-                      linear-gradient(
-                        to right,
-                        rgba(78,52,32,0.06) 0%,
-                        transparent 8%,
-                        transparent 43%,
-                        rgba(0,0,0,0.18) 48.5%,
-                        rgba(0,0,0,0.26) 50%,
-                        rgba(0,0,0,0.18) 51.5%,
-                        transparent 57%,
-                        transparent 92%,
-                        rgba(78,52,32,0.06) 100%
-                      )
-                    `,
-                    borderRadius: 2,
-                  }}
-                />
-
-                {/* Left page edge highlight */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 0, left: 0, bottom: 0,
-                    width: '2px',
-                    background: 'linear-gradient(to bottom, rgba(255,255,255,0.3), rgba(255,255,255,0.5), rgba(255,255,255,0.3))',
-                    borderRadius: '2px 0 0 2px',
-                    pointerEvents: 'none',
-                  }}
-                />
-
-                {/* Right page edge shadow */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 0, right: 0, bottom: 0,
-                    width: '2px',
-                    background: 'linear-gradient(to bottom, rgba(78,52,32,0.06), rgba(78,52,32,0.14), rgba(78,52,32,0.06))',
-                    borderRadius: '0 2px 2px 0',
-                    pointerEvents: 'none',
-                  }}
-                />
-              </div>
-            </motion.div>
-          </AnimatePresence>
-
-          {/* Spread counter dots */}
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 20 }}>
-            {orderData!.spreads.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => { setDirection(i > currentSpread ? 1 : -1); setCurrentSpread(i); }}
-                style={{
-                  width: i === currentSpread ? 20 : 6,
-                  height: 6,
-                  borderRadius: 3,
-                  // ✦ Sienna dots on cream
-                  background: i === currentSpread ? '#4E3420' : 'rgba(78,52,32,0.2)',
-                  border: 'none',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  padding: 0,
-                }}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Next button */}
-        <button
-          onClick={goNext}
-          disabled={currentSpread === total - 1}
-          style={{
-            width: 44, height: 44, borderRadius: '50%',
-            background: 'rgba(78,52,32,0.06)',
-            border: '1px solid rgba(78,52,32,0.15)',
-            color: currentSpread === total - 1 ? 'rgba(78,52,32,0.2)' : 'rgba(78,52,32,0.7)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: currentSpread === total - 1 ? 'not-allowed' : 'pointer',
-            flexShrink: 0,
-            transition: 'all 0.3s ease',
-          }}
-        >
-          <ArrowRight size={18} />
-        </button>
-      </div>
-
-      {/* ── Floating Payment Bar ── */}
-      <AnimatePresence>
-        {showPayment && (
-          <motion.div
-            initial={{ y: 120, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 120, opacity: 0 }}
-            transition={{ duration: 0.7, ease: EASE }}
+          {/* Desktop: Prev button */}
+          <button
+            onClick={goPrev}
+            disabled={isFirst}
+            className="hidden md:flex items-center justify-center w-11 h-11 rounded-full flex-shrink-0 transition-all duration-300 mx-4"
             style={{
-              position: 'fixed',
-              bottom: 24,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              zIndex: 100,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 24,
-              padding: '16px 24px',
-              borderRadius: 8,
-              background: 'rgba(253, 250, 245, 0.92)',
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
-              border: '1px solid rgba(78,52,32,0.12)',
-              boxShadow: '0 8px 40px rgba(78,52,32,0.14), 0 2px 8px rgba(78,52,32,0.08)',
-              minWidth: 'min(90vw, 480px)',
+              background: isFirst ? 'transparent' : 'rgba(78,52,32,0.05)',
+              border: `1px solid ${isFirst ? 'rgba(78,52,32,0.08)' : 'rgba(78,52,32,0.15)'}`,
+              color: isFirst ? 'rgba(78,52,32,0.15)' : 'rgba(78,52,32,0.6)',
+              cursor: isFirst ? 'default' : 'pointer',
             }}
           >
-            <div>
-              <div style={{ fontSize: '0.6rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#9A8A7A', fontFamily: '"Jost", sans-serif', marginBottom: 2 }}>
-                Archival Edition
-              </div>
-              <div style={{ fontSize: '1.15rem', fontFamily: '"Cormorant Garamond", serif', color: '#4E3420', fontWeight: 400, letterSpacing: '0.03em' }}>
-                ₹4,999
-              </div>
+            <ArrowLeft size={17} />
+          </button>
+
+          {/* The spread image with page-turn animation */}
+          <div
+            className="relative flex-1"
+            style={{
+              maxWidth: 'min(92vw, 1000px)',
+              perspective: '2000px',
+            }}
+          >
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={currentSpread}
+                initial={{
+                  x: direction > 0 ? '6%' : '-6%',
+                  opacity: 0,
+                  rotateY: direction > 0 ? 4 : -4,
+                  scale: 0.97,
+                }}
+                animate={{
+                  x: '0%',
+                  opacity: 1,
+                  rotateY: 0,
+                  scale: 1,
+                }}
+                exit={{
+                  x: direction > 0 ? '-6%' : '6%',
+                  opacity: 0,
+                  rotateY: direction > 0 ? -4 : 4,
+                  scale: 0.97,
+                }}
+                transition={{
+                  duration: 0.45,
+                  ease: [0.22, 1, 0.36, 1],
+                }}
+                style={{
+                  transformStyle: 'preserve-3d',
+                  transformOrigin: direction > 0 ? 'left center' : 'right center',
+                }}
+              >
+                {/* Book shadow + image wrapper */}
+                <div
+                  className="relative rounded-sm overflow-hidden"
+                  style={{
+                    boxShadow: `
+                      0 2px 8px rgba(78,52,32,0.08),
+                      0 8px 24px rgba(78,52,32,0.12),
+                      0 24px 60px rgba(78,52,32,0.16)
+                    `,
+                  }}
+                >
+                  {/* Loading shimmer */}
+                  {!imageLoaded && (
+                    <div className="absolute inset-0 z-10 bg-[#f0ebe2] animate-pulse" />
+                  )}
+
+                  <img
+                    src={spread.url}
+                    alt={`Spread ${currentSpread + 1} — ${orderData!.metadata.dest || 'Edition'}`}
+                    className="w-full h-auto block"
+                    style={{ borderRadius: 2 }}
+                    draggable={false}
+                    onLoad={() => setImageLoaded(true)}
+                  />
+
+                  {/* Spine gutter crease */}
+                  <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                      background: `
+                        linear-gradient(
+                          to right,
+                          rgba(78,52,32,0.04) 0%,
+                          transparent 6%,
+                          transparent 44%,
+                          rgba(0,0,0,0.12) 48.5%,
+                          rgba(0,0,0,0.20) 50%,
+                          rgba(0,0,0,0.12) 51.5%,
+                          transparent 56%,
+                          transparent 94%,
+                          rgba(78,52,32,0.04) 100%
+                        )
+                      `,
+                    }}
+                  />
+
+                  {/* Left page edge highlight */}
+                  <div
+                    className="absolute top-0 left-0 bottom-0 w-[2px] pointer-events-none rounded-l-sm"
+                    style={{
+                      background: 'linear-gradient(to bottom, rgba(255,255,255,0.2), rgba(255,255,255,0.4), rgba(255,255,255,0.2))',
+                    }}
+                  />
+
+                  {/* Right page edge shadow */}
+                  <div
+                    className="absolute top-0 right-0 bottom-0 w-[2px] pointer-events-none rounded-r-sm"
+                    style={{
+                      background: 'linear-gradient(to bottom, rgba(78,52,32,0.04), rgba(78,52,32,0.10), rgba(78,52,32,0.04))',
+                    }}
+                  />
+                </div>
+              </motion.div>
+            </AnimatePresence>
+
+            {/* Mobile: Tap zones — left and right halves */}
+            <div className="absolute inset-0 md:hidden flex z-10">
+              <button
+                className="flex-1 h-full bg-transparent border-none outline-none cursor-pointer"
+                onClick={goPrev}
+                disabled={isFirst}
+                aria-label="Previous spread"
+              />
+              <button
+                className="flex-1 h-full bg-transparent border-none outline-none cursor-pointer"
+                onClick={goNext}
+                disabled={isLast}
+                aria-label="Next spread"
+              />
+            </div>
+          </div>
+
+          {/* Desktop: Next button */}
+          <button
+            onClick={goNext}
+            disabled={isLast}
+            className="hidden md:flex items-center justify-center w-11 h-11 rounded-full flex-shrink-0 transition-all duration-300 mx-4"
+            style={{
+              background: isLast ? 'transparent' : 'rgba(78,52,32,0.05)',
+              border: `1px solid ${isLast ? 'rgba(78,52,32,0.08)' : 'rgba(78,52,32,0.15)'}`,
+              color: isLast ? 'rgba(78,52,32,0.15)' : 'rgba(78,52,32,0.6)',
+              cursor: isLast ? 'default' : 'pointer',
+            }}
+          >
+            <ArrowRight size={17} />
+          </button>
+        </div>
+
+        {/* ── Below the book: dots, then info text ── */}
+        <div className="flex flex-col items-center mt-5 sm:mt-6 gap-3 sm:gap-4">
+
+          {/* Progress dots with mobile chevrons */}
+          <div className="flex items-center justify-center gap-1">
+            <button
+              onClick={goPrev}
+              disabled={isFirst}
+              className="md:hidden p-1 transition-opacity"
+              style={{ opacity: isFirst ? 0.2 : 0.5 }}
+              aria-label="Previous"
+            >
+              <ChevronLeft size={14} color="#4E3420" />
+            </button>
+
+            <div className="flex gap-1.5 sm:gap-2">
+              {orderData!.spreads.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => {
+                    setDirection(i > currentSpread ? 1 : -1);
+                    setCurrentSpread(i);
+                  }}
+                  className="border-none p-0 transition-all duration-300"
+                  style={{
+                    width: i === currentSpread ? 18 : 5,
+                    height: 5,
+                    borderRadius: 3,
+                    background: i === currentSpread ? '#4E3420' : 'rgba(78,52,32,0.18)',
+                    cursor: 'pointer',
+                  }}
+                  aria-label={`Go to spread ${i + 1}`}
+                />
+              ))}
             </div>
 
             <button
-              onClick={handlePayment}
-              disabled={isProcessingPayment}
+              onClick={goNext}
+              disabled={isLast}
+              className="md:hidden p-1 transition-opacity"
+              style={{ opacity: isLast ? 0.2 : 0.5 }}
+              aria-label="Next"
+            >
+              <ChevronRight size={14} color="#4E3420" />
+            </button>
+          </div>
+
+          {/* Trip info — below dots */}
+          <div className="flex flex-col items-center gap-1">
+            <div className="text-[0.7rem] sm:text-[0.75rem] text-[var(--sienna)] font-cormorant italic tracking-[0.05em]">
+              {orderData!.metadata.dest || 'Your Edition'}
+              {orderData!.metadata.dates ? ` · ${orderData!.metadata.dates}` : ''}
+            </div>
+            <div className="text-[0.5rem] sm:text-[0.55rem] text-[rgba(78,52,32,0.35)] font-jost tracking-[0.15em] uppercase">
+              Spread {currentSpread + 1} of {total}
+            </div>
+          </div>
+
+          {/* Mobile swipe hint — only shows for first 3 seconds */}
+          <MobileSwipeHint />
+        </div>
+
+        {/* Bottom spacer */}
+        <div style={{ flex: '0.6' }} />
+      </div>
+
+      {/* ── Floating Payment Bar ── */}
+      {/* Centering wrapper — static div with flexbox centering (no transform) */}
+      <div
+        className="fixed z-[100] left-0 right-0 flex justify-center pointer-events-none"
+        style={{
+          bottom: 'max(16px, env(safe-area-inset-bottom, 16px))',
+        }}
+      >
+        <AnimatePresence>
+          {showPayment && (
+            <motion.div
+              initial={{ y: 120, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 120, opacity: 0 }}
+              transition={{ duration: 0.7, ease: EASE }}
+              className="pointer-events-auto flex items-center justify-between rounded-xl sm:rounded-lg"
               style={{
-                padding: '12px 28px',
-                background: isProcessingPayment ? '#8A6A5A' : '#4E3420',
-                color: '#fdfaf5',
-                border: 'none',
-                borderRadius: 4,
-                fontSize: '0.65rem',
-                letterSpacing: '0.2em',
-                textTransform: 'uppercase',
-                fontFamily: '"Jost", sans-serif',
-                cursor: isProcessingPayment ? 'wait' : 'pointer',
-                transition: 'all 0.3s ease',
-                fontWeight: 500,
-                whiteSpace: 'nowrap',
+                width: 'calc(100vw - 32px)',
+                maxWidth: 480,
+                padding: '14px 18px',
+                gap: 16,
+                background: 'rgba(253, 250, 245, 0.94)',
+                backdropFilter: 'blur(24px)',
+                WebkitBackdropFilter: 'blur(24px)',
+                border: '1px solid rgba(78,52,32,0.10)',
+                boxShadow: '0 8px 40px rgba(78,52,32,0.14), 0 2px 8px rgba(78,52,32,0.08)',
               }}
             >
-              {isProcessingPayment ? 'Processing…' : 'Secure Commission'}
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              <div className="flex-shrink-0 min-w-0">
+                <div className="text-[0.55rem] sm:text-[0.6rem] tracking-[0.15em] uppercase text-[#9A8A7A] font-jost mb-0.5">
+                  Archival Edition
+                </div>
+                <div className="text-[1rem] sm:text-[1.15rem] font-cormorant text-[#4E3420] font-normal tracking-[0.03em]">
+                  ₹4,999
+                </div>
+              </div>
+
+              <button
+                onClick={handlePayment}
+                disabled={isProcessingPayment}
+                className="flex-shrink-0 py-3 px-5 sm:px-7 rounded transition-all duration-300 font-jost font-medium whitespace-nowrap active:scale-[0.97]"
+                style={{
+                  background: isProcessingPayment ? '#8A6A5A' : '#4E3420',
+                  color: '#fdfaf5',
+                  border: 'none',
+                  fontSize: '0.6rem',
+                  letterSpacing: '0.2em',
+                  textTransform: 'uppercase',
+                  cursor: isProcessingPayment ? 'wait' : 'pointer',
+                }}
+              >
+                {isProcessingPayment ? 'Processing…' : 'Secure Commission'}
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
+  );
+}
+
+// ─── Mobile Swipe Hint ───────────────────────────────────────────────────────
+// Shows a subtle "swipe to turn" hint that auto-dismisses after 3s
+
+function MobileSwipeHint() {
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    const t = setTimeout(() => setVisible(false), 3000);
+    return () => clearTimeout(t);
+  }, []);
+
+  return (
+    <AnimatePresence>
+      {visible && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.5 }}
+          className="md:hidden text-center mt-4 text-[0.6rem] tracking-[0.15em] uppercase text-[rgba(78,52,32,0.3)] font-jost"
+        >
+          Swipe or tap to turn pages
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

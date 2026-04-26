@@ -12,9 +12,10 @@ export function Process({ isFullPage = false }: ProcessProps) {
   const [ref, isVisible] = useInView();
 
   useSEO({
-    title: 'How It Works — Our Process | Smrithi Atelier',
-    description: 'Upload your trip photos, we design and sequence the layout, preview together on a call, then print and ship your Smyth-sewn archival edition within two weeks.',
-    canonical: 'https://smrithi.online/process',
+    title: isFullPage ? 'How It Works — Our Process | Smrithi Atelier' : '',
+    description: isFullPage ? 'Upload your trip photos, we design and sequence the layout, preview together on a call, then print and ship your Smyth-sewn archival edition within two weeks.' : '',
+    canonical: isFullPage ? 'https://smrithi.online/process' : undefined,
+    skip: !isFullPage,
   });
 
   const steps = [
