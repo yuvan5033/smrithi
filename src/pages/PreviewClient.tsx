@@ -90,6 +90,23 @@ export function PreviewClient() {
     setImageLoaded(false);
   }, [currentSpread]);
 
+  // Image Prefetching
+  useEffect(() => {
+    if (!orderData || viewState !== 'preview') return;
+    
+    const prefetch = (idx: number) => {
+      if (idx >= 0 && idx < orderData.spreads.length) {
+        const img = new Image();
+        img.src = orderData.spreads[idx].url;
+      }
+    };
+
+    // Prefetch next 2 and previous 1 for smooth scrolling
+    prefetch(currentSpread + 1);
+    prefetch(currentSpread + 2);
+    prefetch(currentSpread - 1);
+  }, [currentSpread, orderData, viewState]);
+
   // ─── Fetch ─────────────────────────────────────────────────────────────────
 
   const handleFetch = async () => {
@@ -319,14 +336,13 @@ export function PreviewClient() {
       <div
         className="flex-1 flex flex-col items-center px-0 sm:px-6 md:px-12 relative"
         style={{
-          /* Push content upward: more top padding, less bottom */
-          paddingTop: 'max(24px, 5vh)',
-          paddingBottom: showPayment ? 'max(100px, 14vh)' : 'max(24px, 4vh)',
+          paddingTop: 'env(safe-area-inset-top, 24px)',
+          paddingBottom: showPayment ? '120px' : '40px',
           justifyContent: 'flex-start',
         }}
       >
-        {/* Spacer — pushes the book ~20% from top instead of dead center */}
-        <div style={{ flex: '0.25' }} />
+        {/* Spacer — pushes the book significantly higher */}
+        <div style={{ flex: '0.1' }} />
 
         {/* Desktop nav + Book row */}
         <div className="flex items-center justify-center w-full max-w-[1100px] mx-auto">
@@ -350,38 +366,47 @@ export function PreviewClient() {
           <div
             className="relative flex-1"
             style={{
-              maxWidth: 'min(92vw, 1000px)',
-              perspective: '2000px',
+              maxWidth: 'min(94vw, 1100px)',
+              perspective: '2500px',
+              minHeight: '40vh',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
             }}
           >
-            <AnimatePresence mode="wait" initial={false}>
+            <AnimatePresence initial={false} custom={direction}>
               <motion.div
                 key={currentSpread}
+                custom={direction}
                 initial={{
-                  x: direction > 0 ? '6%' : '-6%',
+                  x: direction > 0 ? '100%' : '-100%',
                   opacity: 0,
-                  rotateY: direction > 0 ? 4 : -4,
-                  scale: 0.97,
+                  rotateY: direction > 0 ? 15 : -15,
+                  scale: 0.9,
                 }}
                 animate={{
                   x: '0%',
                   opacity: 1,
                   rotateY: 0,
                   scale: 1,
+                  zIndex: 1,
                 }}
                 exit={{
-                  x: direction > 0 ? '-6%' : '6%',
+                  x: direction > 0 ? '-100%' : '100%',
                   opacity: 0,
-                  rotateY: direction > 0 ? -4 : 4,
-                  scale: 0.97,
+                  rotateY: direction > 0 ? -15 : 15,
+                  scale: 0.9,
+                  zIndex: 0,
+                  position: 'absolute'
                 }}
                 transition={{
-                  duration: 0.45,
-                  ease: [0.22, 1, 0.36, 1],
+                  duration: 0.6,
+                  ease: [0.32, 0.72, 0, 1], // Custom cinematic easing
                 }}
                 style={{
                   transformStyle: 'preserve-3d',
-                  transformOrigin: direction > 0 ? 'left center' : 'right center',
+                  transformOrigin: 'center center',
+                  width: '100%'
                 }}
               >
                 {/* Book shadow + image wrapper */}
@@ -544,43 +569,31 @@ export function PreviewClient() {
           <MobileSwipeHint />
         </div>
 
-        {/* Bottom spacer */}
-        <div style={{ flex: '0.6' }} />
+        {/* Bottom spacer — much larger to hold the content up */}
+        <div style={{ flex: '0.9' }} />
       </div>
 
       {/* ── Floating Payment Bar ── */}
-      {/* Centering wrapper — static div with flexbox centering (no transform) */}
       <div
-        className="fixed z-[100] left-0 right-0 flex justify-center pointer-events-none"
+        className="fixed z-[100] left-0 right-0 flex justify-center pointer-events-none p-4 sm:p-6"
         style={{
-          bottom: 'max(16px, env(safe-area-inset-bottom, 16px))',
+          bottom: 'env(safe-area-inset-bottom, 20px)',
         }}
       >
         <AnimatePresence>
           {showPayment && (
             <motion.div
-              initial={{ y: 120, opacity: 0 }}
+              initial={{ y: 100, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 120, opacity: 0 }}
-              transition={{ duration: 0.7, ease: EASE }}
-              className="pointer-events-auto flex items-center justify-between rounded-xl sm:rounded-lg"
-              style={{
-                width: 'calc(100vw - 32px)',
-                maxWidth: 480,
-                padding: '14px 18px',
-                gap: 16,
-                background: 'rgba(253, 250, 245, 0.94)',
-                backdropFilter: 'blur(24px)',
-                WebkitBackdropFilter: 'blur(24px)',
-                border: '1px solid rgba(78,52,32,0.10)',
-                boxShadow: '0 8px 40px rgba(78,52,32,0.14), 0 2px 8px rgba(78,52,32,0.08)',
-              }}
+              exit={{ y: 100, opacity: 0 }}
+              transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+              className="pointer-events-auto flex items-center justify-between bg-[rgba(253,250,245,0.95)] backdrop-blur-2xl border border-[rgba(78,52,32,0.12)] shadow-[0_20px_50px_rgba(78,52,32,0.15)] rounded-2xl w-full max-w-[440px] px-5 py-4 gap-4"
             >
-              <div className="flex-shrink-0 min-w-0">
-                <div className="text-[0.55rem] sm:text-[0.6rem] tracking-[0.15em] uppercase text-[#9A8A7A] font-jost mb-0.5">
+              <div className="flex-shrink-0">
+                <div className="text-[0.55rem] tracking-[0.2em] uppercase text-[var(--ink-40)] font-jost mb-0.5">
                   Archival Edition
                 </div>
-                <div className="text-[1rem] sm:text-[1.15rem] font-cormorant text-[#4E3420] font-normal tracking-[0.03em]">
+                <div className="text-[1.1rem] font-cormorant text-[var(--ink)] font-normal">
                   ₹4,999
                 </div>
               </div>
@@ -588,16 +601,7 @@ export function PreviewClient() {
               <button
                 onClick={handlePayment}
                 disabled={isProcessingPayment}
-                className="flex-shrink-0 py-3 px-5 sm:px-7 rounded transition-all duration-300 font-jost font-medium whitespace-nowrap active:scale-[0.97]"
-                style={{
-                  background: isProcessingPayment ? '#8A6A5A' : '#4E3420',
-                  color: '#fdfaf5',
-                  border: 'none',
-                  fontSize: '0.6rem',
-                  letterSpacing: '0.2em',
-                  textTransform: 'uppercase',
-                  cursor: isProcessingPayment ? 'wait' : 'pointer',
-                }}
+                className="flex-shrink-0 py-3 px-6 bg-[#4E3420] text-[#fdfaf5] rounded-lg transition-all duration-300 font-jost font-medium text-[0.65rem] tracking-[0.15em] uppercase active:scale-[0.96] disabled:opacity-50"
               >
                 {isProcessingPayment ? 'Processing…' : 'Secure Commission'}
               </button>
