@@ -93,7 +93,7 @@ export function PreviewClient() {
   // Image Prefetching
   useEffect(() => {
     if (!orderData || viewState !== 'preview') return;
-    
+
     const prefetch = (idx: number) => {
       if (idx >= 0 && idx < orderData.spreads.length) {
         const img = new Image();
@@ -594,7 +594,7 @@ export function PreviewClient() {
                   Archival Edition
                 </div>
                 <div className="text-[1.1rem] font-cormorant text-[var(--ink)] font-normal">
-                  ₹4,999
+                  ₹5000
                 </div>
               </div>
 

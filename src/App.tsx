@@ -15,6 +15,7 @@ import { Preview } from './pages/Preview';
 import { PreviewClient } from './pages/PreviewClient';
 import { Success } from './pages/Success';
 import SmrithiDefinitiveAtelier from './pages/ops';
+import { Pricing } from './components/Pricing';
 
 function AppContent() {
   const location = useLocation();
@@ -38,6 +39,7 @@ function AppContent() {
             <hr className="border-none border-t border-[var(--border)] m-0" />
             <About />
             <Process />
+            <Pricing />
             <CTASection />
             <hr className="border-none border-t border-[var(--border)] m-0" />
             <Footer />

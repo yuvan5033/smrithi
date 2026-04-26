@@ -17,7 +17,9 @@ const razorpay = new Razorpay({
 // 1. DYNAMIC CORS FOR NETLIFY AND LOCALHOST
 const allowedOrigins = [
   'http://localhost:5173',
-  'https://smrithiexperience.netlify.app',
+  'https://smrithiexperience.netlify.app', // Leave this for now as a fallback
+  'https://smrithi.online',
+  'https://www.smrithi.online',
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
@@ -196,7 +198,7 @@ app.post('/api/upload-urls', async (req, res) => {
 app.post('/api/create-order', async (req, res) => {
   try {
     const options = {
-      amount: 499000,
+      amount: 500000,
       currency: "INR",
       receipt: crypto.randomUUID() // <--- Exactly 36 characters. Perfect.
     };
@@ -305,7 +307,7 @@ app.post('/api/orders/:orderId/export/init', async (req, res) => {
   try {
     const metaFile = storage.bucket(bucketName).file(`orders/${orderId}/metadata.json`);
     const [exists] = await metaFile.exists();
-    
+
     let metadata = {};
     if (exists) {
       const [metaContent] = await metaFile.download();

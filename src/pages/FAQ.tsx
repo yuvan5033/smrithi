@@ -7,15 +7,15 @@ import { useNavigate } from 'react-router-dom';
 const FAQS = [
   {
     q: 'How many photos should I submit?',
-    a: 'We work best with 80-200 photographs per trip. More gives us better selection for sequencing; we will curate down to the most meaningful frames. You can submit up to 500 photos.',
+    a: 'We work best with 60-150 photographs per trip. More gives us better selection for sequencing; we will curate down to the most meaningful frames. You can submit up to 200 photos.',
   },
   {
     q: 'How long does it take to receive my album?',
-    a: 'You will receive a digital preview within a few hours of submitting. After our call and your approval, the physical edition ships within 10-14 business days.',
+    a: 'You will receive a digital preview within a few hours of submitting Photos after our call. The physical edition ships within 7-10 business days.',
   },
   {
     q: 'What size are the albums?',
-    a: 'Our standard edition is 30x24cm (landscape). We also offer a portrait 24x30cm edition. Both use the same archival materials and binding methods.',
+    a: 'Our standard edition is A4 sized.',
   },
   {
     q: 'Can I add captions or written notes?',
@@ -35,7 +35,7 @@ const FAQS = [
   },
   {
     q: 'What is your pricing?',
-    a: 'Editions start from Rs 4,800 for a standard 40-page album. Pricing scales with page count. Final pricing is confirmed after the preview call once we know the scope of your edition.',
+    a: 'Editions start from Rs 5,000 for a standard 40-page album. Pricing scales with page count. Final pricing is confirmed after the preview call once we know the scope of your edition.',
   },
 ];
 
@@ -78,9 +78,8 @@ export function FAQ() {
                   className="absolute top-1/2 left-1/2 w-3 h-px bg-[var(--sienna)] -translate-x-1/2 -translate-y-1/2 transition-transform duration-300"
                 />
                 <span
-                  className={`absolute top-1/2 left-1/2 w-px h-3 bg-[var(--sienna)] -translate-x-1/2 -translate-y-1/2 transition-transform duration-300 ${
-                    openIndex === i ? 'rotate-90' : ''
-                  }`}
+                  className={`absolute top-1/2 left-1/2 w-px h-3 bg-[var(--sienna)] -translate-x-1/2 -translate-y-1/2 transition-transform duration-300 ${openIndex === i ? 'rotate-90' : ''
+                    }`}
                 />
               </span>
             </button>
