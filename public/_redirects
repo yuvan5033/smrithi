@@ -1,1 +1,10 @@
-/* /index.html  200
+# Serve static files directly (robots, sitemap, etc.)
+/robots.txt    /robots.txt    200
+/sitemap.xml   /sitemap.xml   200
+/llms.txt      /llms.txt      200
+/favicon.png   /favicon.png   200
+/og-image.png  /og-image.png  200
+/.well-known/* /.well-known/:splat 200
+
+# SPA fallback — must be last
+/*    /index.html   200

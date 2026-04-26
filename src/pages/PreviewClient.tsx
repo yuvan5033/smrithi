@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { useSEO } from '../hooks/useSEO';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -84,6 +85,12 @@ const pageTurnVariants = {
 
 export function PreviewClient() {
   const navigate = useNavigate();
+
+  useSEO({
+    title: 'Preview Your Edition | Smrithi Atelier',
+    description: 'View your curated archival travel photo book preview. Enter your access code to see the digital layout of your bound edition before printing.',
+    canonical: 'https://smrithi.online/preview',
+  });
 
   const [accessCode, setAccessCode] = useState('');
   const [viewState, setViewState] = useState<'gate' | 'loading' | 'preview'>('gate');

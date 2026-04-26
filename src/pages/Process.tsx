@@ -1,4 +1,5 @@
 import { useInView } from '../hooks/useInView';
+import { useSEO } from '../hooks/useSEO';
 import { Button } from '../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
 
@@ -9,6 +10,12 @@ interface ProcessProps {
 export function Process({ isFullPage = false }: ProcessProps) {
   const navigate = useNavigate();
   const [ref, isVisible] = useInView();
+
+  useSEO({
+    title: 'How It Works — Our Process | Smrithi Atelier',
+    description: 'Upload your trip photos, we design and sequence the layout, preview together on a call, then print and ship your Smyth-sewn archival edition within two weeks.',
+    canonical: 'https://smrithi.online/process',
+  });
 
   const steps = [
     {

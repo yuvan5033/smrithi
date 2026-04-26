@@ -1,9 +1,16 @@
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/Button';
 import { motion } from 'framer-motion';
+import { useSEO } from '../hooks/useSEO';
 
 export function Success() {
     const navigate = useNavigate();
+
+    useSEO({
+        title: 'Commission Confirmed | Smrithi Atelier',
+        description: 'Your archival edition has been commissioned. The Smrithi Atelier team will begin curation shortly.',
+        noIndex: true,
+    });
 
     return (
         <div className="min-h-[100dvh] relative flex flex-col items-center justify-center px-8 md:px-12 z-10 overflow-hidden">

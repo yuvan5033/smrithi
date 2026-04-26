@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
+import { useSEO } from '../hooks/useSEO';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Plus, Check } from 'lucide-react';
 import { useCallback, useRef } from 'react';
@@ -78,6 +79,13 @@ const STEP_CONSTRAINTS: Record<number, { max: number }> = {
 
 export function Upload() {
   const navigate = useNavigate();
+
+  useSEO({
+    title: 'Begin Your Edition — Upload Photos | Smrithi Atelier',
+    description: 'Start crafting your archival travel photo book. Upload your trip photographs, tell us your story, and we\'ll design a bound edition built to last generations.',
+    canonical: 'https://smrithi.online/upload',
+  });
+
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<Record<string, string>>({});
   const [photos, setPhotos] = useState<Record<string, { url: string; name: string; id: string; status?: 'pending' | 'uploading' | 'uploaded' | 'error' }[]>>({});

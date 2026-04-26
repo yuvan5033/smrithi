@@ -1,8 +1,16 @@
 import { Button } from '../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
+import { useSEO } from '../hooks/useSEO';
 
 export function Hero() {
   const navigate = useNavigate();
+
+  useSEO({
+    title: 'Smrithi Atelier — Archival Travel Photo Books | Custom Bound Editions',
+    description: 'Smrithi Atelier crafts archival-quality, leatherette-bound travel photo books on 320gsm acid-free stock. One book per journey — built for generations. Starting at ₹4,800.',
+    canonical: 'https://smrithi.online/',
+  });
+
   return (
     <section className="min-h-screen grid place-items-center px-[max(40px,5vw)] pt-[130px] pb-20 relative overflow-hidden">
       <div className="absolute inset-0 pointer-events-none">

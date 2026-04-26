@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useInView } from '../hooks/useInView';
+import { useSEO } from '../hooks/useSEO';
 import { SectionHeader } from '../components/ui/SectionHeader';
 import { Button } from '../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
@@ -42,6 +43,12 @@ export function FAQ() {
   const navigate = useNavigate();
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [ref, isVisible] = useInView();
+
+  useSEO({
+    title: 'FAQ — Frequently Asked Questions | Smrithi Atelier',
+    description: 'How many photos to submit, pricing from ₹4,800, album sizes, archival materials, and delivery timelines. Everything you need to know about Smrithi Atelier photo books.',
+    canonical: 'https://smrithi.online/faq',
+  });
 
   return (
     <div ref={ref} className="py-28 px-[max(40px,5vw)] pt-[120px]">

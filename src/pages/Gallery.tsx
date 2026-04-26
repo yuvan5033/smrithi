@@ -1,4 +1,5 @@
 import { useInView } from '../hooks/useInView';
+import { useSEO } from '../hooks/useSEO';
 import { SectionHeader } from '../components/ui/SectionHeader';
 import { Button } from '../components/ui/Button';
 import { GalleryPlaceholder } from '../components/GalleryPlaceholder';
@@ -16,6 +17,12 @@ const GALLERY_ITEMS = [
 export function Gallery() {
   const navigate = useNavigate();
   const [ref, isVisible] = useInView();
+
+  useSEO({
+    title: 'Gallery — Past Editions | Smrithi Atelier',
+    description: 'Browse archival travel photo book editions crafted by Smrithi Atelier. Kyoto, Patagonia, Santorini, Rajasthan — each journey bound into a permanent volume.',
+    canonical: 'https://smrithi.online/gallery',
+  });
 
   return (
     <div ref={ref} className="py-28 px-[max(40px,5vw)] pt-[120px]">

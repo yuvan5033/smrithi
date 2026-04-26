@@ -2,15 +2,211 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>React Tailwind Business App</title>
-    <meta property="og:image" content="https://bolt.new/static/og_default.png" />
+
+    <!-- ═══════════════ PRIMARY SEO ═══════════════ -->
+    <title>Smrithi Atelier — Archival Travel Photo Books | Custom Bound Editions</title>
+    <meta name="description" content="Smrithi Atelier crafts archival-quality, leatherette-bound travel photo books on 320gsm acid-free stock. One book per journey — built for generations. Starting at ₹4,800." />
+    <meta name="keywords" content="travel photo book, archival photo album, custom photo book India, leatherette bound album, travel memory book, retirement photo book, Smrithi Atelier, premium photo book, acid-free photo album, Smyth-sewn photo book, travel coffee table book, personalised photo book" />
+    <meta name="author" content="Smrithi Atelier" />
+    <link rel="canonical" href="https://smrithi.online/" />
+
+    <!-- ═══════════════ CRAWLING & INDEXING ═══════════════ -->
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow" />
+    <meta name="bingbot" content="index, follow" />
+
+    <!-- ═══════════════ FAVICON ═══════════════ -->
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/favicon.png" />
+
+    <!-- ═══════════════ THEME / MOBILE ═══════════════ -->
+    <meta name="theme-color" content="#4E3420" />
+    <meta name="msapplication-TileColor" content="#4E3420" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Smrithi Atelier" />
+
+    <!-- ═══════════════ OPEN GRAPH (Facebook / LinkedIn / WhatsApp) ═══════════════ -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Smrithi Atelier" />
+    <meta property="og:title" content="Smrithi Atelier — Archival Travel Photo Books" />
+    <meta property="og:description" content="We turn your travel photographs into permanent archival albums — one book per journey, built to outlast everything digital. Smyth-sewn, acid-free, leatherette-bound." />
+    <meta property="og:url" content="https://smrithi.online/" />
+    <meta property="og:image" content="https://smrithi.online/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Smrithi Atelier — Archival Travel Photo Books" />
+    <meta property="og:locale" content="en_IN" />
+
+    <!-- ═══════════════ TWITTER CARD ═══════════════ -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:image" content="https://bolt.new/static/og_default.png" />
+    <meta name="twitter:title" content="Smrithi Atelier — Archival Travel Photo Books" />
+    <meta name="twitter:description" content="One book per journey. Smyth-sewn, acid-free, leatherette-bound. Built for generations. Starting ₹4,800." />
+    <meta name="twitter:image" content="https://smrithi.online/og-image.png" />
+    <meta name="twitter:image:alt" content="Smrithi Atelier — Archival Travel Photo Books" />
+
+    <!-- ═══════════════ STRUCTURED DATA (JSON-LD) ═══════════════ -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "https://smrithi.online/#website",
+          "url": "https://smrithi.online/",
+          "name": "Smrithi Atelier",
+          "description": "Archival travel photo books — one book per journey, built for generations.",
+          "publisher": { "@id": "https://smrithi.online/#organization" },
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": "https://smrithi.online/?q={search_term_string}",
+            "query-input": "required name=search_term_string"
+          }
+        },
+        {
+          "@type": "Organization",
+          "@id": "https://smrithi.online/#organization",
+          "name": "Smrithi Atelier",
+          "url": "https://smrithi.online/",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://smrithi.online/favicon.png",
+            "width": 512,
+            "height": 512
+          },
+          "description": "Smrithi Atelier crafts archival-quality, leatherette-bound travel photo books. One book per journey — Smyth-sewn, acid-free, built for generations.",
+          "foundingDate": "2025",
+          "sameAs": []
+        },
+        {
+          "@type": "Product",
+          "name": "Archival Travel Photo Book",
+          "description": "Custom archival travel photo book printed on 320gsm acid-free matte stock. Smyth-sewn, leatherette-bound, blind-embossed with your trip title. One book per journey.",
+          "brand": {
+            "@type": "Brand",
+            "name": "Smrithi Atelier"
+          },
+          "offers": {
+            "@type": "Offer",
+            "url": "https://smrithi.online/upload",
+            "priceCurrency": "INR",
+            "price": "4800",
+            "priceValidUntil": "2027-12-31",
+            "availability": "https://schema.org/InStock",
+            "seller": { "@id": "https://smrithi.online/#organization" }
+          },
+          "image": "https://smrithi.online/og-image.png",
+          "material": "320gsm archival matte stock, acid-free, UV-resistant",
+          "category": "Photo Books"
+        },
+        {
+          "@type": "FAQPage",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "How many photos should I submit?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "We work best with 80-200 photographs per trip. More gives us better selection for sequencing; we will curate down to the most meaningful frames. You can submit up to 500 photos."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How long does it take to receive my album?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "You will receive a digital preview within a few hours of submitting. After our call and your approval, the physical edition ships within 10-14 business days."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "What size are the albums?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Our standard edition is 30x24cm (landscape). We also offer a portrait 24x30cm edition. Both use the same archival materials and binding methods."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "What is your pricing?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Editions start from Rs 4,800 for a standard 40-page album. Pricing scales with page count. Final pricing is confirmed after the preview call once we know the scope of your edition."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How durable are the albums?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Each edition is Smyth-sewn with archival PVA adhesive. The 320gsm stock is acid-free and UV-resistant. Kept away from direct sunlight, your album should remain pristine for over a century."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Can I add captions or written notes?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes — and we encourage it. The intake form includes a field for trip notes, date ranges, and specific memories. These can be incorporated as captions or a brief introduction page."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Can I order multiple copies?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes. Additional copies of the same edition are available at a reduced cost. Many customers order one to keep and one to gift."
+              }
+            }
+          ]
+        },
+        {
+          "@type": "BreadcrumbList",
+          "itemListElement": [
+            { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://smrithi.online/" },
+            { "@type": "ListItem", "position": 2, "name": "Gallery", "item": "https://smrithi.online/gallery" },
+            { "@type": "ListItem", "position": 3, "name": "Process", "item": "https://smrithi.online/process" },
+            { "@type": "ListItem", "position": 4, "name": "FAQ", "item": "https://smrithi.online/faq" },
+            { "@type": "ListItem", "position": 5, "name": "Begin Your Edition", "item": "https://smrithi.online/upload" }
+          ]
+        }
+      ]
+    }
+    </script>
+
+    <!-- ═══════════════ PRECONNECT FOR PERFORMANCE ═══════════════ -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   </head>
   <body>
-    <div id="root"></div>
+    <!-- Accessible fallback content for crawlers (hidden from visual users) -->
+    <div id="root">
+      <noscript>
+        <h1>Smrithi Atelier — Archival Travel Photo Books</h1>
+        <p>Smrithi Atelier crafts archival-quality, leatherette-bound travel photo books on 320gsm acid-free stock. One book per journey — built for generations.</p>
+        <p>We turn your travel photographs into permanent archival albums. Smyth-sewn, acid-free, leatherette-bound, and blind-embossed with your trip title.</p>
+        <nav>
+          <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="/gallery">Gallery — Past Editions</a></li>
+            <li><a href="/process">How It Works</a></li>
+            <li><a href="/faq">Frequently Asked Questions</a></li>
+            <li><a href="/upload">Begin Your Edition</a></li>
+          </ul>
+        </nav>
+        <h2>How It Works</h2>
+        <ol>
+          <li>Upload — Share your trip photos through our intake form.</li>
+          <li>We Design — Your photos are sequenced and laid out. Digital preview within hours.</li>
+          <li>We Call You — A short conversation to understand the significance of the trip.</li>
+          <li>Bound &amp; Shipped — Smyth-sewn, leatherette-covered, blind-embossed. Ships within two weeks.</li>
+        </ol>
+        <h2>Pricing</h2>
+        <p>Editions start from ₹4,800 for a standard 40-page album.</p>
+      </noscript>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
