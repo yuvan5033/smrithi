@@ -82,9 +82,10 @@ export function Pricing() {
           <div className={`flex flex-col gap-6 lg:gap-8 reveal d3 ${isVisible ? 'in' : ''}`}>
             <div className="flex-1 bg-[var(--cream-d)] relative min-h-[300px] overflow-hidden group">
               <img
-                src="https://images.unsplash.com/photo-1544123089-18214df3b1a1?auto=format&fit=crop&q=80&w=2000"
+                src="https://images.unsplash.com/photo-1544123089-18214df3b1a1?auto=format&fit=crop&q=72&w=1000"
                 alt="Smrithi Album Preview"
                 className="absolute inset-0 w-full h-full object-cover grayscale-[0.2] transition-transform duration-1000 group-hover:scale-105"
+                loading="lazy"
               />
               <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors" />
               <div className="absolute bottom-4 sm:bottom-6 left-4 sm:left-6 right-4 sm:right-6 p-4 sm:p-6 bg-white/90 backdrop-blur-sm border border-white/20">

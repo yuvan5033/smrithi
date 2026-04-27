@@ -36,7 +36,7 @@ export function RealisticBook({ coverColor, fontStyle, tripName }: RealisticBook
     <div>
       <div className="perspective-[1800px] w-full flex justify-center py-8 pb-4">
         <div
-          className={`relative w-[min(280px,50vw)] aspect-[0.72/1] transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+          className={`relative w-[min(280px,50vw)] aspect-[0.72/1] transition-all duration-1000 ease-[cubic-bezier(0.23,1,0.32,1)] ${
             isOpen
               ? 'rotate-y-0 rotate-x-0 rotate-z-0 [filter:drop-shadow(0px_8px_30px_rgba(24,21,15,0.2))] cursor-default'
               : 'cursor-pointer [filter:drop-shadow(6px_14px_40px_rgba(24,21,15,0.35))] hover:[transform:rotateY(-10deg)_rotateX(2deg)_rotateZ(-0.5deg)]'
@@ -77,7 +77,7 @@ export function RealisticBook({ coverColor, fontStyle, tripName }: RealisticBook
           </div>
 
           <div
-            className={`absolute inset-0 transition-all duration-[1150ms] ease-[cubic-bezier(0.77,0,0.175,1)]`}
+            className={`absolute inset-0 transition-all duration-[1450ms] ease-[cubic-bezier(0.33,1,0.68,1)]`}
             style={{
               transformOrigin: 'left center',
               transformStyle: 'preserve-3d',

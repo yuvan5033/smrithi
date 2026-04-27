@@ -69,10 +69,16 @@ export function PreviewClient() {
   const [error, setError] = useState<string | null>(null);
   const [orderData, setOrderData] = useState<OrderData | null>(null);
   const [currentSpread, setCurrentSpread] = useState(0);
-  const [direction, setDirection] = useState(1);
   const [showPayment, setShowPayment] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
+
+  // Track the URL of the loaded image instead of a boolean to avoid race conditions
+  const [loadedImageUrl, setLoadedImageUrl] = useState<string | null>(null);
+
+  // Page-turn state
+  const [isFlipping, setIsFlipping] = useState(false);
+  const [nextSpreadIdx, setNextSpreadIdx] = useState<number | null>(null);
+  const [flipDirection, setFlipDirection] = useState<'forward' | 'backward'>('forward');
 
   // Touch/swipe refs
   const touchStartX = useRef(0);
@@ -84,11 +90,6 @@ export function PreviewClient() {
     const t = setTimeout(() => setShowPayment(true), 4000);
     return () => clearTimeout(t);
   }, [viewState]);
-
-  // Reset image loaded state when spread changes
-  useEffect(() => {
-    setImageLoaded(false);
-  }, [currentSpread]);
 
   // Image Prefetching
   useEffect(() => {
@@ -138,19 +139,37 @@ export function PreviewClient() {
     }
   };
 
-  // ─── Navigation ────────────────────────────────────────────────────────────
+  // ─── Navigation with Page-Turn ─────────────────────────────────────────────
 
   const goNext = useCallback(() => {
-    if (!orderData || currentSpread >= orderData.spreads.length - 1) return;
-    setDirection(1);
-    setCurrentSpread((s) => s + 1);
-  }, [currentSpread, orderData]);
+    if (!orderData || isFlipping || currentSpread >= orderData.spreads.length - 1) return;
+    setIsFlipping(true);
+    setFlipDirection('forward');
+    setNextSpreadIdx(currentSpread + 1);
+  }, [currentSpread, orderData, isFlipping]);
 
   const goPrev = useCallback(() => {
-    if (currentSpread <= 0) return;
-    setDirection(-1);
-    setCurrentSpread((s) => s - 1);
-  }, [currentSpread]);
+    if (!orderData || isFlipping || currentSpread <= 0) return;
+    setIsFlipping(true);
+    setFlipDirection('backward');
+    setNextSpreadIdx(currentSpread - 1);
+  }, [currentSpread, orderData, isFlipping]);
+
+  // Jump to specific spread (from dots) — instant, no animation
+  const jumpToSpread = useCallback((idx: number) => {
+    if (!orderData || isFlipping || idx === currentSpread) return;
+    if (idx < 0 || idx >= orderData.spreads.length) return;
+    setCurrentSpread(idx);
+  }, [currentSpread, orderData, isFlipping]);
+
+  // After flip animation completes
+  const handleFlipComplete = useCallback(() => {
+    if (nextSpreadIdx !== null) {
+      setCurrentSpread(nextSpreadIdx);
+      setNextSpreadIdx(null);
+    }
+    setIsFlipping(false);
+  }, [nextSpreadIdx]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -321,10 +340,21 @@ export function PreviewClient() {
 
   // ─── Render: Preview ───────────────────────────────────────────────────────
 
-  const spread = orderData!.spreads[currentSpread];
+  const currentSpreadData = orderData!.spreads[currentSpread];
   const total = orderData!.spreads.length;
   const isFirst = currentSpread === 0;
   const isLast = currentSpread === total - 1;
+
+  const nextSpreadData = nextSpreadIdx !== null ? orderData!.spreads[nextSpreadIdx] : null;
+
+  // The base pages that stay glued to the table
+  const baseLeftUrl = isFlipping && flipDirection === 'backward' && nextSpreadData
+    ? nextSpreadData.url
+    : currentSpreadData.url;
+
+  const baseRightUrl = isFlipping && flipDirection === 'forward' && nextSpreadData
+    ? nextSpreadData.url
+    : currentSpreadData.url;
 
   return (
     <div
@@ -332,16 +362,16 @@ export function PreviewClient() {
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {/* ── Main content — image pushed ~20% higher ── */}
+      {/* ── Main content ── */}
       <div
-        className="flex-1 flex flex-col items-center px-0 sm:px-6 md:px-12 relative"
+        className="flex-1 flex flex-col items-center px-0 sm:px-6 mt-[5vh] md:px-12 relative"
         style={{
           paddingTop: 'env(safe-area-inset-top, 24px)',
           paddingBottom: showPayment ? '120px' : '40px',
           justifyContent: 'flex-start',
         }}
       >
-        {/* Spacer — pushes the book significantly higher */}
+        {/* Spacer — pushes the book higher */}
         <div style={{ flex: '0.1' }} />
 
         {/* Desktop nav + Book row */}
@@ -350,19 +380,19 @@ export function PreviewClient() {
           {/* Desktop: Prev button */}
           <button
             onClick={goPrev}
-            disabled={isFirst}
+            disabled={isFirst || isFlipping}
             className="hidden md:flex items-center justify-center w-11 h-11 rounded-full flex-shrink-0 transition-all duration-300 mx-4"
             style={{
-              background: isFirst ? 'transparent' : 'rgba(78,52,32,0.05)',
-              border: `1px solid ${isFirst ? 'rgba(78,52,32,0.08)' : 'rgba(78,52,32,0.15)'}`,
-              color: isFirst ? 'rgba(78,52,32,0.15)' : 'rgba(78,52,32,0.6)',
-              cursor: isFirst ? 'default' : 'pointer',
+              background: (isFirst || isFlipping) ? 'transparent' : 'rgba(78,52,32,0.05)',
+              border: `1px solid ${(isFirst || isFlipping) ? 'rgba(78,52,32,0.08)' : 'rgba(78,52,32,0.15)'}`,
+              color: (isFirst || isFlipping) ? 'rgba(78,52,32,0.15)' : 'rgba(78,52,32,0.6)',
+              cursor: (isFirst || isFlipping) ? 'default' : 'pointer',
             }}
           >
             <ArrowLeft size={17} />
           </button>
 
-          {/* The spread image with page-turn animation */}
+          {/* ===== PAGE-TURN SPREAD ===== */}
           <div
             className="relative flex-1"
             style={{
@@ -371,122 +401,162 @@ export function PreviewClient() {
               minHeight: '40vh',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
             }}
           >
-            <AnimatePresence initial={false} custom={direction}>
-              <motion.div
-                key={currentSpread}
-                custom={direction}
-                initial={{
-                  x: direction > 0 ? '100%' : '-100%',
-                  opacity: 0,
-                  rotateY: direction > 0 ? 15 : -15,
-                  scale: 0.9,
-                }}
-                animate={{
-                  x: '0%',
-                  opacity: 1,
-                  rotateY: 0,
-                  scale: 1,
-                  zIndex: 1,
-                }}
-                exit={{
-                  x: direction > 0 ? '-100%' : '100%',
-                  opacity: 0,
-                  rotateY: direction > 0 ? -15 : 15,
-                  scale: 0.9,
-                  zIndex: 0,
-                  position: 'absolute'
-                }}
-                transition={{
-                  duration: 0.6,
-                  ease: [0.32, 0.72, 0, 1], // Custom cinematic easing
-                }}
-                style={{
-                  transformStyle: 'preserve-3d',
-                  transformOrigin: 'center center',
-                  width: '100%'
-                }}
+            {/* Book shadow wrapper */}
+            <div
+              className="relative rounded-sm overflow-hidden w-full"
+              style={{
+                boxShadow: `
+                  0 2px 8px rgba(78,52,32,0.08),
+                  0 8px 24px rgba(78,52,32,0.12),
+                  0 24px 60px rgba(78,52,32,0.16)
+                `,
+              }}
+            >
+              {/* Container with book aspect ratio */}
+              <div
+                className="w-full relative bg-[#f0ebe2]"
+                style={{ aspectRatio: '2 / 1.35' }}
               >
-                {/* Book shadow + image wrapper */}
-                <div
-                  className="relative rounded-sm overflow-hidden"
-                  style={{
-                    boxShadow: `
-                      0 2px 8px rgba(78,52,32,0.08),
-                      0 8px 24px rgba(78,52,32,0.12),
-                      0 24px 60px rgba(78,52,32,0.16)
-                    `,
-                  }}
-                >
-                  {/* Loading shimmer */}
-                  {!imageLoaded && (
+                {/* ----- BASE LEFT HALF ----- */}
+                <div className="absolute top-0 left-0 w-1/2 h-full overflow-hidden z-0">
+                  {loadedImageUrl !== baseLeftUrl && (
                     <div className="absolute inset-0 z-10 bg-[#f0ebe2] animate-pulse" />
                   )}
-
                   <img
-                    src={spread.url}
-                    alt={`Spread ${currentSpread + 1} — ${orderData!.metadata.dest || 'Edition'}`}
-                    className="w-full h-auto block"
-                    style={{ borderRadius: 2 }}
+                    key={`base-left-${baseLeftUrl}`}
+                    src={baseLeftUrl}
+                    alt="Left page"
+                    className="absolute top-0 left-0 w-[200%] h-full"
+                    style={{ objectFit: 'cover', objectPosition: 'left top' }}
                     draggable={false}
-                    onLoad={() => setImageLoaded(true)}
-                  />
-
-                  {/* Spine gutter crease */}
-                  <div
-                    className="absolute inset-0 pointer-events-none"
-                    style={{
-                      background: `
-                        linear-gradient(
-                          to right,
-                          rgba(78,52,32,0.04) 0%,
-                          transparent 6%,
-                          transparent 44%,
-                          rgba(0,0,0,0.12) 48.5%,
-                          rgba(0,0,0,0.20) 50%,
-                          rgba(0,0,0,0.12) 51.5%,
-                          transparent 56%,
-                          transparent 94%,
-                          rgba(78,52,32,0.04) 100%
-                        )
-                      `,
-                    }}
-                  />
-
-                  {/* Left page edge highlight */}
-                  <div
-                    className="absolute top-0 left-0 bottom-0 w-[2px] pointer-events-none rounded-l-sm"
-                    style={{
-                      background: 'linear-gradient(to bottom, rgba(255,255,255,0.2), rgba(255,255,255,0.4), rgba(255,255,255,0.2))',
-                    }}
-                  />
-
-                  {/* Right page edge shadow */}
-                  <div
-                    className="absolute top-0 right-0 bottom-0 w-[2px] pointer-events-none rounded-r-sm"
-                    style={{
-                      background: 'linear-gradient(to bottom, rgba(78,52,32,0.04), rgba(78,52,32,0.10), rgba(78,52,32,0.04))',
-                    }}
+                    onLoad={() => setLoadedImageUrl(baseLeftUrl)}
                   />
                 </div>
-              </motion.div>
-            </AnimatePresence>
+
+                {/* ----- BASE RIGHT HALF ----- */}
+                <div className="absolute top-0 right-0 w-1/2 h-full overflow-hidden z-0">
+                  <img
+                    key={`base-right-${baseRightUrl}`}
+                    src={baseRightUrl}
+                    alt="Right page"
+                    className="absolute top-0 right-0 w-[200%] h-full"
+                    style={{ objectFit: 'cover', objectPosition: 'right top' }}
+                    draggable={false}
+                  />
+                </div>
+
+                {/* ----- FLIPPING PAGE ----- */}
+                <AnimatePresence mode="wait">
+                  {isFlipping && nextSpreadData && (
+                    <motion.div
+                      key={`flip-${currentSpread}-${flipDirection}`}
+                      className="absolute top-0 z-10 h-full"
+                      style={{
+                        width: '50%',
+                        left: flipDirection === 'backward' ? '0%' : '50%',
+                        transformOrigin: flipDirection === 'backward' ? 'right center' : 'left center',
+                        transformStyle: 'preserve-3d',
+                      }}
+                      initial={{ rotateY: 0 }}
+                      animate={{
+                        rotateY: flipDirection === 'forward' ? -180 : 180,
+                      }}
+                      transition={{
+                        duration: 0.85,
+                        ease: [0.33, 1, 0.68, 1],
+                      }}
+                      onAnimationComplete={handleFlipComplete}
+                    >
+                      {/* FRONT FACE (The side lifting up) */}
+                      <div
+                        className="absolute inset-0 overflow-hidden"
+                        style={{ WebkitBackfaceVisibility: 'hidden', backfaceVisibility: 'hidden' }}
+                      >
+                        <img
+                          src={currentSpreadData.url}
+                          alt="Flipping front"
+                          className={`absolute top-0 w-[200%] h-full ${flipDirection === 'forward' ? 'right-0' : 'left-0'}`}
+                          style={{ objectFit: 'cover', objectPosition: flipDirection === 'forward' ? 'right top' : 'left top' }}
+                          draggable={false}
+                        />
+                      </div>
+
+                      {/* BACK FACE (The side landing down) */}
+                      <div
+                        className="absolute inset-0 overflow-hidden"
+                        style={{
+                          WebkitBackfaceVisibility: 'hidden',
+                          backfaceVisibility: 'hidden',
+                          transform: 'rotateY(180deg)',
+                        }}
+                      >
+                        <img
+                          src={nextSpreadData.url}
+                          alt="Flipping back"
+                          className={`absolute top-0 w-[200%] h-full ${flipDirection === 'forward' ? 'left-0' : 'right-0'}`}
+                          style={{ objectFit: 'cover', objectPosition: flipDirection === 'forward' ? 'left top' : 'right top' }}
+                          draggable={false}
+                        />
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* ---- Gutter crease ---- */}
+                <div
+                  className="absolute inset-0 pointer-events-none z-20"
+                  style={{
+                    background: `
+                      linear-gradient(
+                        to right,
+                        rgba(78,52,32,0.04) 0%,
+                        transparent 6%,
+                        transparent 44%,
+                        rgba(0,0,0,0.12) 48.5%,
+                        rgba(0,0,0,0.20) 50%,
+                        rgba(0,0,0,0.12) 51.5%,
+                        transparent 56%,
+                        transparent 94%,
+                        rgba(78,52,32,0.04) 100%
+                      )
+                    `,
+                  }}
+                />
+
+                {/* Left page edge highlight */}
+                <div
+                  className="absolute top-0 left-0 bottom-0 w-[2px] pointer-events-none rounded-l-sm z-20"
+                  style={{
+                    background: 'linear-gradient(to bottom, rgba(255,255,255,0.2), rgba(255,255,255,0.4), rgba(255,255,255,0.2))',
+                  }}
+                />
+
+                {/* Right page edge shadow */}
+                <div
+                  className="absolute top-0 right-0 bottom-0 w-[2px] pointer-events-none rounded-r-sm z-20"
+                  style={{
+                    background: 'linear-gradient(to bottom, rgba(78,52,32,0.04), rgba(78,52,32,0.10), rgba(78,52,32,0.04))',
+                  }}
+                />
+              </div>
+            </div>
 
             {/* Mobile: Tap zones — left and right halves */}
-            <div className="absolute inset-0 md:hidden flex z-10">
+            <div className="absolute inset-0 md:hidden flex z-30">
               <button
                 className="flex-1 h-full bg-transparent border-none outline-none cursor-pointer"
                 onClick={goPrev}
-                disabled={isFirst}
-                aria-label="Previous spread"
+                disabled={isFirst || isFlipping}
+                aria-label="Previous page"
               />
               <button
                 className="flex-1 h-full bg-transparent border-none outline-none cursor-pointer"
                 onClick={goNext}
-                disabled={isLast}
-                aria-label="Next spread"
+                disabled={isLast || isFlipping}
+                aria-label="Next page"
               />
             </div>
           </div>
@@ -494,13 +564,13 @@ export function PreviewClient() {
           {/* Desktop: Next button */}
           <button
             onClick={goNext}
-            disabled={isLast}
+            disabled={isLast || isFlipping}
             className="hidden md:flex items-center justify-center w-11 h-11 rounded-full flex-shrink-0 transition-all duration-300 mx-4"
             style={{
-              background: isLast ? 'transparent' : 'rgba(78,52,32,0.05)',
-              border: `1px solid ${isLast ? 'rgba(78,52,32,0.08)' : 'rgba(78,52,32,0.15)'}`,
-              color: isLast ? 'rgba(78,52,32,0.15)' : 'rgba(78,52,32,0.6)',
-              cursor: isLast ? 'default' : 'pointer',
+              background: (isLast || isFlipping) ? 'transparent' : 'rgba(78,52,32,0.05)',
+              border: `1px solid ${(isLast || isFlipping) ? 'rgba(78,52,32,0.08)' : 'rgba(78,52,32,0.15)'}`,
+              color: (isLast || isFlipping) ? 'rgba(78,52,32,0.15)' : 'rgba(78,52,32,0.6)',
+              cursor: (isLast || isFlipping) ? 'default' : 'pointer',
             }}
           >
             <ArrowRight size={17} />
@@ -514,9 +584,9 @@ export function PreviewClient() {
           <div className="flex items-center justify-center gap-1">
             <button
               onClick={goPrev}
-              disabled={isFirst}
+              disabled={isFirst || isFlipping}
               className="md:hidden p-1 transition-opacity"
-              style={{ opacity: isFirst ? 0.2 : 0.5 }}
+              style={{ opacity: (isFirst || isFlipping) ? 0.2 : 0.5 }}
               aria-label="Previous"
             >
               <ChevronLeft size={14} color="#4E3420" />
@@ -526,17 +596,15 @@ export function PreviewClient() {
               {orderData!.spreads.map((_, i) => (
                 <button
                   key={i}
-                  onClick={() => {
-                    setDirection(i > currentSpread ? 1 : -1);
-                    setCurrentSpread(i);
-                  }}
+                  onClick={() => jumpToSpread(i)}
+                  disabled={isFlipping}
                   className="border-none p-0 transition-all duration-300"
                   style={{
                     width: i === currentSpread ? 18 : 5,
                     height: 5,
                     borderRadius: 3,
                     background: i === currentSpread ? '#4E3420' : 'rgba(78,52,32,0.18)',
-                    cursor: 'pointer',
+                    cursor: isFlipping ? 'default' : 'pointer',
                   }}
                   aria-label={`Go to spread ${i + 1}`}
                 />
@@ -545,9 +613,9 @@ export function PreviewClient() {
 
             <button
               onClick={goNext}
-              disabled={isLast}
+              disabled={isLast || isFlipping}
               className="md:hidden p-1 transition-opacity"
-              style={{ opacity: isLast ? 0.2 : 0.5 }}
+              style={{ opacity: (isLast || isFlipping) ? 0.2 : 0.5 }}
               aria-label="Next"
             >
               <ChevronRight size={14} color="#4E3420" />
@@ -569,7 +637,7 @@ export function PreviewClient() {
           <MobileSwipeHint />
         </div>
 
-        {/* Bottom spacer — much larger to hold the content up */}
+        {/* Bottom spacer */}
         <div style={{ flex: '0.9' }} />
       </div>
 
@@ -614,7 +682,6 @@ export function PreviewClient() {
 }
 
 // ─── Mobile Swipe Hint ───────────────────────────────────────────────────────
-// Shows a subtle "swipe to turn" hint that auto-dismisses after 3s
 
 function MobileSwipeHint() {
   const [visible, setVisible] = useState(true);
